@@ -75,6 +75,22 @@ export default async function AdminPage() {
       </header>
 
       <main className="max-w-[1200px] mx-auto p-6 space-y-8">
+        <section className="bg-white border border-black/10 rounded-xl p-5 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-[#1a1a1a]">Shopify connection</div>
+            <div className="text-xs text-gray-500">
+              Install the Shopify app once to get a live Admin API token. Paste the token into Vercel as{' '}
+              <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">SHOPIFY_ADMIN_ACCESS_TOKEN</code> and redeploy.
+            </div>
+          </div>
+          <a
+            href="/api/shopify/install?shop=fixmyfashion"
+            className="px-4 py-2 rounded-lg bg-[#0F6E56] text-white text-sm font-medium hover:bg-[#0c5c48]"
+          >
+            Connect Shopify
+          </a>
+        </section>
+
         <section>
           <h1 className="text-xl font-semibold text-[#1a1a1a] mb-1">All brands</h1>
           <p className="text-sm text-gray-500 mb-4">{brandStats.length} brand(s) active.</p>
