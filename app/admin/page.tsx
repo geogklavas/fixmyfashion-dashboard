@@ -84,7 +84,7 @@ export default async function AdminPage() {
             </div>
           </div>
           <a
-            href="/api/shopify/install?shop=fixmyfashion"
+            href="/api/shopify/install?shop=4xps3i-gg"
             className="px-4 py-2 rounded-lg bg-[#0F6E56] text-white text-sm font-medium hover:bg-[#0c5c48]"
           >
             Connect Shopify
