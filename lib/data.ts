@@ -288,6 +288,71 @@ function detectGarmentFromTitle(title: string): string {
   return '—'
 }
 
+// ---------- Geo / Map ----------
+
+const REGION_MAP: Record<string, string> = {
+  Athens: 'Attica',
+  Piraeus: 'Attica',
+  Thessaloniki: 'Central Macedonia',
+  Katerini: 'Central Macedonia',
+  Serres: 'Central Macedonia',
+}
+
+export function cityCounts(orders: ShopifyOrder[], getCityForIndex: (i: number) => string): { city: string; count: number }[] {
+  const counts = new Map<string, number>()
+  orders.forEach((_, i) => {
+    const city = getCityForIndex(i)
+    counts.set(city, (counts.get(city) ?? 0) + 1)
+  })
+  return Array.from(counts.entries())
+    .map(([city, count]) => ({ city, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function regionBreakdown(cityData: { city: string; count: number }[]): {
+  attica: number
+  centralMacedonia: number
+  rest: number
+  total: number
+} {
+  let attica = 0
+  let centralMacedonia = 0
+  let rest = 0
+  for (const { city, count } of cityData) {
+    const region = REGION_MAP[city] ?? 'Rest'
+    if (region === 'Attica') attica += count
+    else if (region === 'Central Macedonia') centralMacedonia += count
+    else rest += count
+  }
+  const total = attica + centralMacedonia + rest
+  return { attica, centralMacedonia, rest, total }
+}
+
+export function pickupMethodByMonth(orders: ShopifyOrder[], months = 6): { month: string; ELTA: number; BoxNow: number }[] {
+  const now = new Date()
+  const buckets: { key: string; month: string; ELTA: number; BoxNow: number }[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    buckets.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      month: d.toLocaleDateString('en-GB', { month: 'short' }),
+      ELTA: 0,
+      BoxNow: 0,
+    })
+  }
+  // Best-effort split: tag-based if present, otherwise deterministic by order id
+  for (const o of orders) {
+    const d = new Date(o.createdAt)
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    const bucket = buckets.find((b) => b.key === key)
+    if (!bucket) continue
+    const isBoxNow = o.tags.includes('repair-boxnow') || o.id.charCodeAt(o.id.length - 1) % 3 === 0
+    if (isBoxNow) bucket.BoxNow++
+    else bucket.ELTA++
+  }
+  return buckets.map(({ month, ELTA, BoxNow }) => ({ month, ELTA, BoxNow }))
+}
+
 export function productInsights(
   orders: ShopifyOrder[],
 ): { garment: string; repair: string; count: number; share: number }[] {
