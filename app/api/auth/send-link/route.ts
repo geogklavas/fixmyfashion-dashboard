@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   }
 
   const dashboardUrl = process.env.DASHBOARD_URL ?? 'http://localhost:3000'
-  const link = `${dashboardUrl}/auth/verify?token=${token}`
+  const link = `${dashboardUrl}/api/auth/verify?token=${token}`
 
   const resendKey = process.env.RESEND_API_KEY
   const from = process.env.RESEND_FROM_EMAIL ?? 'FixMyFashion <dashboard@fixmyfashion.gr>'
