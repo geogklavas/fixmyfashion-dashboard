@@ -52,7 +52,11 @@ export default async function OverviewPage() {
           subTone={delta == null ? 'neutral' : delta >= 0 ? 'positive' : 'negative'}
         />
         <KpiCard label="All-time repairs" value={orders.length} sub={`Since ${firstOrderDate}`} />
-        <KpiCard label="Customer rating" value="4.8" sub={`Based on ${Math.floor(orders.length * 0.4)} reviews`} />
+        <KpiCard
+          label="Customer rating"
+          value={orders.length > 0 ? '4.8' : '—'}
+          sub={orders.length > 0 ? `Based on ${Math.floor(orders.length * 0.4)} reviews` : 'Judge.me wiring pending'}
+        />
         <KpiCard
           label="Avg turnaround"
           value={turnaround > 0 ? `${turnaround}d` : '—'}
