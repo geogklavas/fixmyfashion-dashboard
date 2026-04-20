@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
   const { data: brand, error: brandErr } = await sb
     .from('brand_sessions')
-    .select('brand_handle, brand_name, brand_email')
+    .select('brand_handle, brand_name, brand_email, role')
     .eq('brand_handle', link.brand_handle)
     .maybeSingle()
 
@@ -47,13 +47,16 @@ export async function GET(req: Request) {
     .update({ last_login_at: new Date().toISOString() })
     .eq('brand_handle', brand.brand_handle)
 
+  const role = (brand as { role?: string }).role === 'admin' ? 'admin' : 'brand'
   const jwt = await createSessionToken({
     brandHandle: brand.brand_handle,
     brandName: brand.brand_name,
     brandEmail: brand.brand_email,
+    role,
   })
 
-  const res = NextResponse.redirect(`${dashboardUrl}/dashboard/overview`)
+  const landing = role === 'admin' ? '/admin' : '/dashboard/overview'
+  const res = NextResponse.redirect(`${dashboardUrl}${landing}`)
   res.cookies.set(SESSION_COOKIE, jwt, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

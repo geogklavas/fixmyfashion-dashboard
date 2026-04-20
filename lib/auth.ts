@@ -4,10 +4,13 @@ import { cookies } from 'next/headers'
 export const SESSION_COOKIE = 'fmf_session'
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30 // 30 days
 
+export type SessionRole = 'brand' | 'admin'
+
 export interface BrandSession extends JWTPayload {
   brandHandle: string
   brandName: string
   brandEmail: string
+  role?: SessionRole
 }
 
 function getSecret(): Uint8Array {

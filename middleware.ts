@@ -12,13 +12,22 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  const isAdminRoute = req.nextUrl.pathname.startsWith('/admin')
+  if (isAdminRoute && session.role !== 'admin') {
+    const url = req.nextUrl.clone()
+    url.pathname = '/dashboard/overview'
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
   const res = NextResponse.next()
   res.headers.set('x-brand-handle', session.brandHandle)
   res.headers.set('x-brand-name', session.brandName)
   res.headers.set('x-brand-email', session.brandEmail)
+  res.headers.set('x-role', session.role ?? 'brand')
   return res
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*'],
 }
