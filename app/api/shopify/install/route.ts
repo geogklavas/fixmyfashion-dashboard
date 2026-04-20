@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   }
 
   const state = randomBytes(16).toString('hex')
-  const dashboardUrl = process.env.DASHBOARD_URL ?? url.origin
+  const dashboardUrl = (process.env.DASHBOARD_URL ?? url.origin).trim().replace(/\/+$/, '')
   const redirectUri = `${dashboardUrl}/api/shopify/callback`
 
   const authorizeUrl = new URL(`https://${shop}/admin/oauth/authorize`)
