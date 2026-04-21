@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { StatusChip } from './StatusChip'
-import { detectGarmentType, detectRepairType, formatFullDate, formatRelative } from '@/lib/tokens'
+import { detectGarmentType, formatFullDate, formatRelative } from '@/lib/tokens'
 
 export type LogRow = {
   id: string
@@ -11,65 +11,87 @@ export type LogRow = {
   status: string
   productTitle: string
   price: string
+  fulfilledAt: string | null
 }
 
-const STATUSES = ['All', 'Quote sent', 'Confirmed', 'Received', 'In progress', 'QA complete', 'Dispatched', 'Delivered']
-const REPAIR_TYPES = ['All', 'Zip', 'Hem', 'Seam', 'Button', 'Knitwear', 'Alteration', 'Other']
+const STATUSES = ['All', 'Quote sent', 'In workshop', 'Dispatched']
 const PAGE_SIZE = 20
+
+function daysInWorkshop(createdAt: string): number {
+  return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
+}
 
 export function RepairLogTable({ rows }: { rows: LogRow[] }) {
   const [status, setStatus] = useState('All')
-  const [repairType, setRepairType] = useState('All')
-  const [month, setMonth] = useState('All')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  const months = useMemo(() => {
-    const now = new Date()
-    const arr: { key: string; label: string }[] = [{ key: 'All', label: 'All months' }]
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      arr.push({
-        key: `${d.getFullYear()}-${d.getMonth()}`,
-        label: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
-      })
-    }
-    return arr
-  }, [])
-
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const fromMs = from ? new Date(from).getTime() : null
+    const toMs = to ? new Date(to).getTime() + 86_400_000 - 1 : null // inclusive end of day
     return rows.filter((r) => {
       if (status !== 'All' && r.status !== status) return false
-      if (repairType !== 'All' && detectRepairType(r.productTitle) !== repairType) return false
-      if (month !== 'All') {
-        const d = new Date(r.createdAt)
-        if (`${d.getFullYear()}-${d.getMonth()}` !== month) return false
+      if (fromMs != null || toMs != null) {
+        const t = new Date(r.createdAt).getTime()
+        if (fromMs != null && t < fromMs) return false
+        if (toMs != null && t > toMs) return false
+      }
+      if (q) {
+        const lastFour = r.orderName.replace('#', '').slice(-4).toLowerCase()
+        const fmf = `fmf-${lastFour}`
+        if (!r.orderName.toLowerCase().includes(q) && !fmf.includes(q)) return false
       }
       return true
     })
-  }, [rows, status, repairType, month])
+  }, [rows, status, from, to, search])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const start = (currentPage - 1) * PAGE_SIZE
   const slice = filtered.slice(start, start + PAGE_SIZE)
 
+  function resetPage<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v)
+      setPage(1)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        <Select label="Status" value={status} options={STATUSES} onChange={(v) => { setStatus(v); setPage(1) }} />
-        <Select
-          label="Repair type"
-          value={repairType}
-          options={REPAIR_TYPES}
-          onChange={(v) => { setRepairType(v); setPage(1) }}
-        />
-        <Select
-          label="Month"
-          value={month}
-          options={months.map((m) => m.key)}
-          labels={months.map((m) => m.label)}
-          onChange={(v) => { setMonth(v); setPage(1) }}
-        />
+      <div className="flex flex-wrap gap-3 items-end">
+        <label className="flex flex-col gap-1 text-xs text-gray-500">
+          <span>Search</span>
+          <input
+            type="search"
+            placeholder="#FMF-1234 or 1234"
+            value={search}
+            onChange={(e) => resetPage(setSearch)(e.target.value)}
+            className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0F6E56]/20 min-w-[200px]"
+          />
+        </label>
+        <Select label="Status" value={status} options={STATUSES} onChange={resetPage(setStatus)} />
+        <label className="flex flex-col gap-1 text-xs text-gray-500">
+          <span>From</span>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => resetPage(setFrom)(e.target.value)}
+            className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-gray-500">
+          <span>To</span>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => resetPage(setTo)(e.target.value)}
+            className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+          />
+        </label>
       </div>
 
       <div className="bg-white border border-black/10 rounded-xl overflow-hidden">
@@ -79,17 +101,16 @@ export function RepairLogTable({ rows }: { rows: LogRow[] }) {
               <tr>
                 <Th>Order ID</Th>
                 <Th>Date</Th>
-                <Th>Type</Th>
                 <Th>Repair</Th>
                 <Th>Status</Th>
-                <Th className="text-right">Price</Th>
-                <Th className="text-right">Score</Th>
+                <Th className="text-right">Customer paid</Th>
+                <Th className="text-right">Days in workshop</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5">
               {slice.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-400 text-sm">
+                  <td colSpan={6} className="text-center py-10 text-gray-400 text-sm">
                     No repairs match the current filters.
                   </td>
                 </tr>
@@ -97,7 +118,8 @@ export function RepairLogTable({ rows }: { rows: LogRow[] }) {
               {slice.map((r) => {
                 const lastFour = r.orderName.replace('#', '').slice(-4)
                 const garment = detectGarmentType(r.productTitle)
-                const title = r.productTitle.length > 24 ? r.productTitle.slice(0, 24) + '…' : r.productTitle
+                const full = r.productTitle.length > 30 ? r.productTitle.slice(0, 30) + '…' : r.productTitle
+                const days = r.status === 'In workshop' ? daysInWorkshop(r.createdAt) : null
                 return (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <Td className="font-mono text-xs text-gray-700">#FMF-{lastFour}</Td>
@@ -105,16 +127,27 @@ export function RepairLogTable({ rows }: { rows: LogRow[] }) {
                       <span title={formatFullDate(r.createdAt)}>{formatRelative(r.createdAt)}</span>
                     </Td>
                     <Td>
-                      <span className="inline-block w-8 text-center text-[10px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">
+                      <span
+                        className="inline-block w-8 text-center text-[10px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5 mr-2"
+                        title={garment}
+                      >
                         {garment}
                       </span>
+                      <span className="text-gray-700" title={r.productTitle}>
+                        {full}
+                      </span>
                     </Td>
-                    <Td className="text-gray-700">{title}</Td>
                     <Td>
                       <StatusChip status={r.status} />
                     </Td>
                     <Td className="text-right tabular-nums">€{parseFloat(r.price).toFixed(0)}</Td>
-                    <Td className="text-right text-gray-400">—</Td>
+                    <Td className="text-right tabular-nums">
+                      {days == null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        <span className={days > 10 ? 'text-[#BA7517] font-medium' : 'text-gray-700'}>{days}d</span>
+                      )}
+                    </Td>
                   </tr>
                 )
               })}
@@ -161,26 +194,24 @@ function Select({
   label,
   value,
   options,
-  labels,
   onChange,
 }: {
   label: string
   value: string
   options: string[]
-  labels?: string[]
   onChange: (v: string) => void
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs">
-      <span className="text-gray-500">{label}</span>
+    <label className="flex flex-col gap-1 text-xs text-gray-500">
+      <span>{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white hover:border-black/20 focus:outline-none focus:ring-2 focus:ring-[#0F6E56]/20"
       >
-        {options.map((opt, i) => (
+        {options.map((opt) => (
           <option key={opt} value={opt}>
-            {labels?.[i] ?? opt}
+            {opt}
           </option>
         ))}
       </select>

@@ -14,6 +14,8 @@ export interface ShopifyOrder {
   createdAt: string
   tags: string[]
   financialStatus: string
+  customerEmail: string | null
+  shippingCity: string | null
   lineItems: LineItem[]
   fulfillments: Fulfillment[]
 }
@@ -84,6 +86,8 @@ const ORDERS_QUERY = /* GraphQL */ `
           createdAt
           tags
           displayFinancialStatus
+          email
+          shippingAddress { city }
           lineItems(first: 5) {
             edges {
               node {
@@ -110,6 +114,8 @@ type OrdersResponse = {
         createdAt: string
         tags: string[]
         displayFinancialStatus: string
+        email: string | null
+        shippingAddress: { city: string | null } | null
         lineItems: { edges: { node: { title: string; originalUnitPriceSet: { shopMoney: { amount: string } } } }[] }
         fulfillments: { createdAt: string; status: string }[]
       }
@@ -134,6 +140,8 @@ export async function getBrandOrders(brandHandle: string): Promise<ShopifyOrder[
         createdAt: n.createdAt,
         tags: n.tags,
         financialStatus: n.displayFinancialStatus,
+        customerEmail: n.email,
+        shippingCity: n.shippingAddress?.city ?? null,
         lineItems: n.lineItems.edges.map((e) => ({
           title: e.node.title,
           price: { amount: e.node.originalUnitPriceSet.shopMoney.amount },
@@ -188,13 +196,28 @@ export async function getBrandConfig(brandHandle: string): Promise<BrandConfig |
   return null
 }
 
-export function detectStatus(tags: string[]): string {
-  if (tags.includes('repair-delivered')) return 'Delivered'
-  if (tags.includes('repair-dispatched')) return 'Dispatched'
-  if (tags.includes('repair-completed')) return 'QA complete'
-  if (tags.includes('repair-in-progress')) return 'In progress'
-  if (tags.includes('repair-received')) return 'Received'
-  if (tags.includes('repair-confirmed')) return 'Confirmed'
-  if (tags.includes('repair-quote-sent')) return 'Quote sent'
+export type RepairStatus = 'Dispatched' | 'In workshop' | 'Quote sent' | 'Pending'
+
+export function detectStatus(order: Pick<ShopifyOrder, 'tags' | 'fulfillments'>): RepairStatus {
+  if (order.fulfillments.length > 0) return 'Dispatched'
+  if (order.tags.includes('repair-in-progress')) return 'In workshop'
+  if (order.tags.includes('repair-quote-sent')) return 'Quote sent'
   return 'Pending'
+}
+
+export function detectJobCategory(tags: string[]): string {
+  const t = tags.find((x) => x.startsWith('job-cat-'))
+  return t ? t.replace('job-cat-', '') : 'unknown'
+}
+
+export function detectJobType(tags: string[]): string {
+  const t = tags.find((x) => x.startsWith('job-type-'))
+  return t ? t.replace('job-type-', '') : 'other'
+}
+
+export function isFulfilledInLastDays(order: Pick<ShopifyOrder, 'fulfillments'>, days: number): boolean {
+  const f = order.fulfillments[0]
+  if (!f) return false
+  const age = (Date.now() - new Date(f.createdAt).getTime()) / 86_400_000
+  return age <= days
 }

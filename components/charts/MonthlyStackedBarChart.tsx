@@ -1,7 +1,14 @@
 'use client'
 
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { REPAIR_TYPES, REPAIR_TYPE_COLORS } from '@/lib/data'
+import { JOB_CATEGORIES, JOB_CATEGORY_COLORS } from '@/lib/data'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  repair: 'Repair',
+  alteration: 'Alteration',
+  cleaning: 'Cleaning',
+  colour: 'Colour',
+}
 
 export function MonthlyStackedBarChart({
   data,
@@ -17,14 +24,14 @@ export function MonthlyStackedBarChart({
         <Tooltip
           contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)' }}
         />
-        <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
-        {REPAIR_TYPES.map((type, i) => (
+        <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" formatter={(v) => CATEGORY_LABELS[v] ?? v} />
+        {JOB_CATEGORIES.map((cat, i) => (
           <Bar
-            key={type}
-            dataKey={type}
+            key={cat}
+            dataKey={cat}
             stackId="a"
-            fill={REPAIR_TYPE_COLORS[type]}
-            radius={i === REPAIR_TYPES.length - 1 ? [4, 4, 0, 0] : 0}
+            fill={JOB_CATEGORY_COLORS[cat]}
+            radius={i === JOB_CATEGORIES.length - 1 ? [4, 4, 0, 0] : 0}
           />
         ))}
       </BarChart>

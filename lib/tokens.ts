@@ -27,7 +27,6 @@ export const DASHBOARD_TABS = [
   { slug: 'sustainability', label: 'Sustainability' },
   { slug: 'log', label: 'Repair Log' },
   { slug: 'analytics', label: 'Analytics' },
-  { slug: 'map', label: 'Map' },
   { slug: 'reports', label: 'Reports' },
   { slug: 'settings', label: 'Settings' },
 ] as const

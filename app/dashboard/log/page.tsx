@@ -15,9 +15,10 @@ export default async function LogPage() {
       id: o.id,
       orderName: o.name,
       createdAt: o.createdAt,
-      status: detectStatus(o.tags),
+      status: detectStatus(o),
       productTitle: firstItem?.title ?? 'Repair',
       price: firstItem?.price.amount ?? '0',
+      fulfilledAt: o.fulfillments[0]?.createdAt ?? null,
     }
   })
 

@@ -42,66 +42,71 @@ export function isUsingMockData(): boolean {
 export function countByStatus(orders: ShopifyOrder[]): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const o of orders) {
-    const s = detectStatus(o.tags)
+    const s = detectStatus(o)
     counts[s] = (counts[s] ?? 0) + 1
   }
   return counts
 }
 
-export function pipelineCounts(orders: ShopifyOrder[]): {
-  received: number
-  inProgress: number
-  qaComplete: number
-  dispatched: number
-} {
-  let received = 0
-  let inProgress = 0
-  let qaComplete = 0
-  let dispatched = 0
-  for (const o of orders) {
-    const t = o.tags
-    if (t.includes('repair-delivered')) continue
-    if (t.includes('repair-dispatched')) {
-      dispatched++
-      continue
-    }
-    if (t.includes('repair-completed')) {
-      qaComplete++
-      continue
-    }
-    if (t.includes('repair-in-progress')) {
-      inProgress++
-      continue
-    }
-    if (t.includes('repair-received')) {
-      received++
-      continue
-    }
-  }
-  return { received, inProgress, qaComplete, dispatched }
+// ---------- Fulfilled helpers ----------
+// "Fulfilled" = dispatched to customer = order.fulfillments.length > 0.
+// Replaces the old repair-delivered tag check everywhere.
+
+export function fulfilledOrders(orders: ShopifyOrder[]): ShopifyOrder[] {
+  return orders.filter((o) => o.fulfillments.length > 0)
 }
+
+function fulfilledAt(order: ShopifyOrder): Date | null {
+  const f = order.fulfillments[0]
+  return f ? new Date(f.createdAt) : null
+}
+
+function inMonth(date: Date, year: number, month: number): boolean {
+  return date.getFullYear() === year && date.getMonth() === month
+}
+
+// ---------- Pipeline (2 counters) ----------
+
+export function pipelineCounts(orders: ShopifyOrder[]): {
+  inWorkshop: number
+  returningRecently: number
+} {
+  let inWorkshop = 0
+  let returningRecently = 0
+  for (const o of orders) {
+    if (o.fulfillments.length > 0) {
+      // Returning to customers = fulfilled in last 10 days
+      const age = (Date.now() - new Date(o.fulfillments[0].createdAt).getTime()) / 86_400_000
+      if (age <= 10) returningRecently++
+      continue
+    }
+    if (o.tags.includes('repair-in-progress')) inWorkshop++
+  }
+  return { inWorkshop, returningRecently }
+}
+
+// ---------- This / last month (Fulfilled-based) ----------
 
 export function thisMonthCount(orders: ShopifyOrder[]): number {
   const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth()
-  return orders.filter((o) => {
-    const d = new Date(o.createdAt)
-    return d.getFullYear() === y && d.getMonth() === m
+  return fulfilledOrders(orders).filter((o) => {
+    const f = fulfilledAt(o)
+    return f != null && inMonth(f, now.getFullYear(), now.getMonth())
   }).length
 }
 
 export function lastMonthCount(orders: ShopifyOrder[]): number {
   const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth() - 1
-  const refY = m < 0 ? y - 1 : y
-  const refM = (m + 12) % 12
-  return orders.filter((o) => {
-    const d = new Date(o.createdAt)
-    return d.getFullYear() === refY && d.getMonth() === refM
+  const rawM = now.getMonth() - 1
+  const refY = rawM < 0 ? now.getFullYear() - 1 : now.getFullYear()
+  const refM = (rawM + 12) % 12
+  return fulfilledOrders(orders).filter((o) => {
+    const f = fulfilledAt(o)
+    return f != null && inMonth(f, refY, refM)
   }).length
 }
+
+// ---------- Monthly volume (Fulfilled by fulfillment month) ----------
 
 export function monthlyVolume(orders: ShopifyOrder[], months = 6): { month: string; count: number }[] {
   const now = new Date()
@@ -112,17 +117,20 @@ export function monthlyVolume(orders: ShopifyOrder[], months = 6): { month: stri
     const label = d.toLocaleDateString('en-GB', { month: 'short' })
     buckets.push({ key, month: label, count: 0 })
   }
-  for (const o of orders) {
-    const d = new Date(o.createdAt)
-    const key = `${d.getFullYear()}-${d.getMonth()}`
+  for (const o of fulfilledOrders(orders)) {
+    const f = fulfilledAt(o)
+    if (!f) continue
+    const key = `${f.getFullYear()}-${f.getMonth()}`
     const bucket = buckets.find((b) => b.key === key)
     if (bucket) bucket.count++
   }
   return buckets.map(({ month, count }) => ({ month, count }))
 }
 
+// ---------- Turnaround ----------
+
 export function averageTurnaroundDays(orders: ShopifyOrder[]): number {
-  const completed = orders.filter((o) => o.tags.includes('repair-delivered') && o.fulfillments.length > 0)
+  const completed = fulfilledOrders(orders)
   if (completed.length === 0) return 0
   const total = completed.reduce((sum, o) => {
     const start = new Date(o.createdAt).getTime()
@@ -132,13 +140,23 @@ export function averageTurnaroundDays(orders: ShopifyOrder[]): number {
   return Math.round((total / completed.length) * 10) / 10
 }
 
+// % of Fulfilled orders dispatched within N days of createdAt.
+export function deliveredWithinDays(orders: ShopifyOrder[], days: number): { pct: number; hits: number; total: number } {
+  const completed = fulfilledOrders(orders)
+  if (completed.length === 0) return { pct: 0, hits: 0, total: 0 }
+  const hits = completed.filter((o) => {
+    const diff = (new Date(o.fulfillments[0].createdAt).getTime() - new Date(o.createdAt).getTime()) / 86_400_000
+    return diff <= days
+  }).length
+  return { pct: Math.round((hits / completed.length) * 100), hits, total: completed.length }
+}
+
 // ---------- Sustainability ----------
 
-export const CO2_PER_REPAIR = 3 // kg
-export const WATER_PER_REPAIR = 2700 // litres
+export const CO2_PER_REPAIR = 3 // kg (WRAP UK benchmark)
 
 export function completedCount(orders: ShopifyOrder[]): number {
-  return orders.filter((o) => o.tags.includes('repair-delivered')).length
+  return fulfilledOrders(orders).length
 }
 
 export function sustainabilityTotals(orders: ShopifyOrder[]) {
@@ -146,8 +164,7 @@ export function sustainabilityTotals(orders: ShopifyOrder[]) {
   return {
     completed,
     co2Kg: completed * CO2_PER_REPAIR,
-    waterL: completed * WATER_PER_REPAIR,
-    rerepairRate: 0, // no tag for re-repair yet
+    rerepairRate: 0, // no re-repair signal in Shopify yet
   }
 }
 
@@ -165,11 +182,9 @@ export function cumulativeCO2ByMonth(
       delivered: 0,
     })
   }
-  // Count delivered orders by the month they were delivered (fulfillment) — fall back to createdAt
-  for (const o of orders) {
-    if (!o.tags.includes('repair-delivered')) continue
-    const deliveredAt = o.fulfillments[0]?.createdAt ?? o.createdAt
-    const d = new Date(deliveredAt)
+  // Fulfilled orders grouped by fulfillment month, then accumulated × 3kg CO2.
+  for (const o of fulfilledOrders(orders)) {
+    const d = new Date(o.fulfillments[0].createdAt)
     const key = `${d.getFullYear()}-${d.getMonth()}`
     const bucket = buckets.find((b) => b.key === key)
     if (bucket) bucket.delivered++
@@ -181,41 +196,94 @@ export function cumulativeCO2ByMonth(
   })
 }
 
-// ---------- Analytics ----------
+// ---------- Customer metrics (Analytics KPIs) ----------
 
-const REPAIR_TYPES = ['Zip', 'Hem', 'Seam', 'Button', 'Knitwear', 'Other'] as const
-const REPAIR_TYPE_COLORS: Record<string, string> = {
-  Zip: '#0F6E56',
-  Hem: '#185FA5',
-  Seam: '#BA7517',
-  Button: '#534AB7',
-  Knitwear: '#6b7280',
-  Other: '#B8BAC0',
-}
-export { REPAIR_TYPES, REPAIR_TYPE_COLORS }
-
-function detectTypeFromTitle(title: string): string {
-  const t = title.toLowerCase()
-  if (t.includes('zip')) return 'Zip'
-  if (t.includes('hem')) return 'Hem'
-  if (t.includes('seam')) return 'Seam'
-  if (t.includes('button')) return 'Button'
-  if (t.includes('knit') || t.includes('darn') || t.includes('wool')) return 'Knitwear'
-  return 'Other'
+export function repeatCustomerRate(orders: ShopifyOrder[]): { pct: number; repeaters: number; unique: number } {
+  const completed = fulfilledOrders(orders)
+  const byEmail = new Map<string, number>()
+  for (const o of completed) {
+    const key = (o.customerEmail ?? '').trim().toLowerCase()
+    if (!key) continue
+    byEmail.set(key, (byEmail.get(key) ?? 0) + 1)
+  }
+  const unique = byEmail.size
+  if (unique === 0) return { pct: 0, repeaters: 0, unique: 0 }
+  let repeaters = 0
+  byEmail.forEach((count) => {
+    if (count >= 2) repeaters++
+  })
+  return { pct: Math.round((repeaters / unique) * 100), repeaters, unique }
 }
 
-export function repairTypeBreakdown(orders: ShopifyOrder[]): { type: string; count: number }[] {
+// ---------- Analytics (job-cat-* / job-type-* tag based) ----------
+
+export const JOB_CATEGORIES = ['repair', 'alteration', 'cleaning', 'colour'] as const
+export type JobCategory = (typeof JOB_CATEGORIES)[number]
+
+export const JOB_CATEGORY_COLORS: Record<string, string> = {
+  repair: '#0F6E56',
+  alteration: '#185FA5',
+  cleaning: '#BA7517',
+  colour: '#534AB7',
+  unknown: '#B8BAC0',
+}
+
+export const JOB_TYPE_LABELS: Record<string, string> = {
+  'repair-seam': 'Seam repair',
+  'repair-button': 'Button repair',
+  'repair-hole': 'Hole repair',
+  'repair-zipper': 'Zipper repair',
+  'repair-else': 'Other repair',
+  'alter-height': 'Hem / length alteration',
+  'alter-width': 'Waist / width alteration',
+  'alter-else': 'Other alteration',
+  other: 'Other',
+}
+
+function jobCategoryOf(tags: string[]): string {
+  const t = tags.find((x) => x.startsWith('job-cat-'))
+  return t ? t.replace('job-cat-', '') : 'unknown'
+}
+
+function jobTypeOf(tags: string[]): string {
+  const t = tags.find((x) => x.startsWith('job-type-'))
+  return t ? t.replace('job-type-', '') : 'other'
+}
+
+// Outer ring = category count, only orders that carry a job-cat-* tag.
+export function jobCategoryBreakdown(orders: ShopifyOrder[]): { category: string; count: number }[] {
   const counts: Record<string, number> = {}
   for (const o of orders) {
-    const title = o.lineItems[0]?.title ?? ''
-    const type = detectTypeFromTitle(title)
-    counts[type] = (counts[type] ?? 0) + 1
+    const cat = jobCategoryOf(o.tags)
+    if (cat === 'unknown') continue
+    counts[cat] = (counts[cat] ?? 0) + 1
   }
-  return REPAIR_TYPES.map((t) => ({ type: t, count: counts[t] ?? 0 })).filter((r) => r.count > 0)
+  return JOB_CATEGORIES.map((c) => ({ category: c, count: counts[c] ?? 0 })).filter((r) => r.count > 0)
+}
+
+// Inner ring = job-type-* breakdown (repairs + alterations only, per spec).
+export function jobTypeBreakdown(orders: ShopifyOrder[]): { type: string; label: string; count: number; category: string }[] {
+  const counts = new Map<string, { category: string; count: number }>()
+  for (const o of orders) {
+    const cat = jobCategoryOf(o.tags)
+    if (cat !== 'repair' && cat !== 'alteration') continue
+    const t = jobTypeOf(o.tags)
+    const existing = counts.get(t)
+    if (existing) existing.count++
+    else counts.set(t, { category: cat, count: 1 })
+  }
+  return Array.from(counts.entries())
+    .map(([type, { category, count }]) => ({ type, label: JOB_TYPE_LABELS[type] ?? type, count, category }))
+    .sort((a, b) => b.count - a.count)
+}
+
+// Orders that have at least one job-cat-* tag. Used to gate Analytics widgets.
+export function classifiedOrderCount(orders: ShopifyOrder[]): number {
+  return orders.filter((o) => o.tags.some((t) => t.startsWith('job-cat-'))).length
 }
 
 export function turnaroundDistribution(orders: ShopifyOrder[]): { bucket: string; count: number }[] {
-  const completed = orders.filter((o) => o.tags.includes('repair-delivered') && o.fulfillments.length > 0)
+  const completed = fulfilledOrders(orders)
   const buckets = ['3d', '4d', '5d', '6d', '7d', '8d', '9d', '10d', '10d+']
   const counts: Record<string, number> = Object.fromEntries(buckets.map((b) => [b, 0]))
   for (const o of completed) {
@@ -228,20 +296,11 @@ export function turnaroundDistribution(orders: ShopifyOrder[]): { bucket: string
   return buckets.map((b) => ({ bucket: b, count: counts[b] }))
 }
 
-export function onTimeRate(orders: ShopifyOrder[]): number {
-  const completed = orders.filter((o) => o.tags.includes('repair-delivered') && o.fulfillments.length > 0)
-  if (completed.length === 0) return 0
-  const onTime = completed.filter((o) => {
-    const days = (new Date(o.fulfillments[0].createdAt).getTime() - new Date(o.createdAt).getTime()) / 86_400_000
-    return days <= 10
-  }).length
-  return Math.round((onTime / completed.length) * 100)
-}
-
-export function monthlyByType(
+// Monthly stacked bar: Fulfilled orders per month split by job-cat-*.
+export function monthlyByCategory(
   orders: ShopifyOrder[],
   months = 6,
-): { month: string; [repairType: string]: string | number }[] {
+): { month: string; [k: string]: string | number }[] {
   const now = new Date()
   const buckets: { key: string; month: string; counts: Record<string, number> }[] = []
   for (let i = months - 1; i >= 0; i--) {
@@ -252,21 +311,23 @@ export function monthlyByType(
       counts: {},
     })
   }
-  for (const o of orders) {
-    const d = new Date(o.createdAt)
+  for (const o of fulfilledOrders(orders)) {
+    const d = new Date(o.fulfillments[0].createdAt)
     const key = `${d.getFullYear()}-${d.getMonth()}`
     const bucket = buckets.find((b) => b.key === key)
     if (!bucket) continue
-    const type = detectTypeFromTitle(o.lineItems[0]?.title ?? '')
-    bucket.counts[type] = (bucket.counts[type] ?? 0) + 1
+    const cat = jobCategoryOf(o.tags)
+    if (cat === 'unknown') continue
+    bucket.counts[cat] = (bucket.counts[cat] ?? 0) + 1
   }
   return buckets.map((b) => {
     const row: { month: string; [k: string]: string | number } = { month: b.month }
-    for (const t of REPAIR_TYPES) row[t] = b.counts[t] ?? 0
+    for (const c of JOB_CATEGORIES) row[c] = b.counts[c] ?? 0
     return row
   })
 }
 
+// Garment hint from line item title (best effort, for product insights only).
 const GARMENT_LABELS: Record<string, string> = {
   JN: 'Jeans',
   JK: 'Jackets',
@@ -280,36 +341,28 @@ const GARMENT_LABELS: Record<string, string> = {
 function detectGarmentFromTitle(title: string): string {
   const t = title.toLowerCase()
   if (t.includes('jean') || t.includes('denim')) return 'JN'
-  if (t.includes('jacket') || t.includes('coat')) return 'JK'
-  if (t.includes('trouser') || t.includes('pant')) return 'TR'
-  if (t.includes('shirt') || t.includes('blouse') || t.includes('top')) return 'SH'
-  if (t.includes('knit') || t.includes('wool') || t.includes('sweater')) return 'KW'
-  if (t.includes('dress') || t.includes('skirt')) return 'DR'
+  if (t.includes('jacket') || t.includes('coat') || t.includes('μπουφ') || t.includes('παλτ')) return 'JK'
+  if (t.includes('trouser') || t.includes('pant') || t.includes('παντ')) return 'TR'
+  if (t.includes('shirt') || t.includes('blouse') || t.includes('top') || t.includes('πουκ')) return 'SH'
+  if (t.includes('knit') || t.includes('wool') || t.includes('sweater') || t.includes('πλεκτ')) return 'KW'
+  if (t.includes('dress') || t.includes('skirt') || t.includes('φουστ') || t.includes('φορεμ')) return 'DR'
   return '—'
 }
 
-// ---------- Geo / Map ----------
+// ---------- Regional breakdown (Analytics stat block, no map) ----------
 
 const REGION_MAP: Record<string, string> = {
   Athens: 'Attica',
   Piraeus: 'Attica',
+  'Αθήνα': 'Attica',
+  'Πειραιάς': 'Attica',
   Thessaloniki: 'Central Macedonia',
+  'Θεσσαλονίκη': 'Central Macedonia',
   Katerini: 'Central Macedonia',
   Serres: 'Central Macedonia',
 }
 
-export function cityCounts(orders: ShopifyOrder[], getCityForIndex: (i: number) => string): { city: string; count: number }[] {
-  const counts = new Map<string, number>()
-  orders.forEach((_, i) => {
-    const city = getCityForIndex(i)
-    counts.set(city, (counts.get(city) ?? 0) + 1)
-  })
-  return Array.from(counts.entries())
-    .map(([city, count]) => ({ city, count }))
-    .sort((a, b) => b.count - a.count)
-}
-
-export function regionBreakdown(cityData: { city: string; count: number }[]): {
+export function regionBreakdown(orders: ShopifyOrder[]): {
   attica: number
   centralMacedonia: number
   rest: number
@@ -318,55 +371,35 @@ export function regionBreakdown(cityData: { city: string; count: number }[]): {
   let attica = 0
   let centralMacedonia = 0
   let rest = 0
-  for (const { city, count } of cityData) {
-    const region = REGION_MAP[city] ?? 'Rest'
-    if (region === 'Attica') attica += count
-    else if (region === 'Central Macedonia') centralMacedonia += count
-    else rest += count
+  for (const o of orders) {
+    const city = o.shippingCity ?? ''
+    const region = REGION_MAP[city] ?? (city ? 'Rest' : null)
+    if (!region) continue
+    if (region === 'Attica') attica++
+    else if (region === 'Central Macedonia') centralMacedonia++
+    else rest++
   }
   const total = attica + centralMacedonia + rest
   return { attica, centralMacedonia, rest, total }
 }
 
-export function pickupMethodByMonth(orders: ShopifyOrder[], months = 6): { month: string; ELTA: number; BoxNow: number }[] {
-  const now = new Date()
-  const buckets: { key: string; month: string; ELTA: number; BoxNow: number }[] = []
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    buckets.push({
-      key: `${d.getFullYear()}-${d.getMonth()}`,
-      month: d.toLocaleDateString('en-GB', { month: 'short' }),
-      ELTA: 0,
-      BoxNow: 0,
-    })
-  }
-  // Best-effort split: tag-based if present, otherwise deterministic by order id
-  for (const o of orders) {
-    const d = new Date(o.createdAt)
-    const key = `${d.getFullYear()}-${d.getMonth()}`
-    const bucket = buckets.find((b) => b.key === key)
-    if (!bucket) continue
-    const isBoxNow = o.tags.includes('repair-boxnow') || o.id.charCodeAt(o.id.length - 1) % 3 === 0
-    if (isBoxNow) bucket.BoxNow++
-    else bucket.ELTA++
-  }
-  return buckets.map(({ month, ELTA, BoxNow }) => ({ month, ELTA, BoxNow }))
-}
+// ---------- Product insights (garment × job-type, Fulfilled only) ----------
 
 export function productInsights(
   orders: ShopifyOrder[],
 ): { garment: string; repair: string; count: number; share: number }[] {
+  const source = fulfilledOrders(orders)
   const combos = new Map<string, { garment: string; repair: string; count: number }>()
-  for (const o of orders) {
+  for (const o of source) {
     const title = o.lineItems[0]?.title ?? ''
     const garment = GARMENT_LABELS[detectGarmentFromTitle(title)]
-    const repair = detectTypeFromTitle(title)
+    const repair = JOB_TYPE_LABELS[jobTypeOf(o.tags)] ?? 'Other'
     const key = `${garment}__${repair}`
     const existing = combos.get(key)
     if (existing) existing.count++
     else combos.set(key, { garment, repair, count: 1 })
   }
-  const total = orders.length || 1
+  const total = source.length || 1
   return Array.from(combos.values())
     .map((c) => ({ ...c, share: Math.round((c.count / total) * 100) }))
     .sort((a, b) => b.count - a.count)
