@@ -141,11 +141,23 @@ function buildPDF(data: ReportData, title: string, subtitle: string): jsPDF {
   return doc
 }
 
-function downloadMonthlyPDF(data: ReportData) {
-  const now = new Date()
-  const monthLabel = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-  const doc = buildPDF(data, `Monthly report — ${monthLabel}`, `Repair service performance for ${data.brandName}.`)
-  doc.save(`fmf-monthly-${data.brandName}-${now.toISOString().slice(0, 7)}.pdf`)
+function downloadRangePDF(data: ReportData, from: string, to: string) {
+  const start = from ? new Date(from) : new Date()
+  const end = to ? new Date(to) : new Date()
+  const label = `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+
+  const fromMs = start.getTime()
+  const toMs = end.getTime() + 86_400_000 - 1
+  const ranged = {
+    ...data,
+    rows: data.rows.filter((r) => {
+      const t = new Date(r.createdAt).getTime()
+      return t >= fromMs && t <= toMs
+    }),
+  }
+
+  const doc = buildPDF(ranged, `Report — ${label}`, `Repair service performance for ${data.brandName}.`)
+  doc.save(`fmf-report-${data.brandName}-${start.toISOString().slice(0, 10)}_${end.toISOString().slice(0, 10)}.pdf`)
 }
 
 function downloadSustainabilityCert(data: ReportData) {
@@ -156,16 +168,22 @@ function downloadSustainabilityCert(data: ReportData) {
   doc.save(`fmf-sustainability-${data.brandName}-${label.replace(' ', '-')}.pdf`)
 }
 
-function downloadYTD(data: ReportData) {
-  const now = new Date()
-  const label = `Jan–${now.toLocaleDateString('en-GB', { month: 'short' })} ${now.getFullYear()}`
-  const doc = buildPDF(data, `Year-to-date summary — ${label}`, `Cumulative performance for ${data.brandName}.`)
-  doc.save(`fmf-ytd-${data.brandName}-${now.getFullYear()}.pdf`)
+function isoDaysAgo(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
 }
 
 export function ReportDownloads({ data }: { data: ReportData }) {
   const [delivery, setDelivery] = useState<'monthly_pdf_csv' | 'monthly_pdf' | 'off'>('monthly_pdf_csv')
   const [savedMsg, setSavedMsg] = useState('')
+
+  // Default range = current calendar month
+  const now = new Date()
+  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const defaultTo = now.toISOString().slice(0, 10)
+  const [from, setFrom] = useState(defaultFrom)
+  const [to, setTo] = useState(defaultTo)
 
   function savePref() {
     // Supabase write deferred — just show optimistic confirmation for now
@@ -173,20 +191,49 @@ export function ReportDownloads({ data }: { data: ReportData }) {
     setTimeout(() => setSavedMsg(''), 2500)
   }
 
-  const now = new Date()
-  const monthLabel = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const quarter = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`
-  const ytdLabel = `Jan–${now.toLocaleDateString('en-GB', { month: 'short' })}`
 
   return (
     <div className="space-y-6">
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DownloadCard
-          title="Monthly report"
-          sub={monthLabel}
-          button="Download PDF"
-          onClick={() => downloadMonthlyPDF(data)}
-        />
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border border-black/10 rounded-xl p-5 flex flex-col md:col-span-1">
+          <div className="text-xs uppercase tracking-wider text-gray-500">Monthly report</div>
+          <div className="text-base font-semibold text-[#1a1a1a] mt-1">Date range PDF</div>
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="text-xs text-gray-500 flex flex-col gap-1">
+              <span>From</span>
+              <input
+                type="date"
+                value={from}
+                max={to}
+                onChange={(e) => setFrom(e.target.value)}
+                className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+              />
+            </label>
+            <label className="text-xs text-gray-500 flex flex-col gap-1">
+              <span>To</span>
+              <input
+                type="date"
+                value={to}
+                min={from}
+                onChange={(e) => setTo(e.target.value)}
+                className="border border-black/10 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+              />
+            </label>
+            <div className="flex gap-1.5 flex-wrap mt-1">
+              <QuickRange label="This month" from={defaultFrom} to={defaultTo} setFrom={setFrom} setTo={setTo} />
+              <QuickRange label="Last 30d" from={isoDaysAgo(30)} to={defaultTo} setFrom={setFrom} setTo={setTo} />
+              <QuickRange label="Last 90d" from={isoDaysAgo(90)} to={defaultTo} setFrom={setFrom} setTo={setTo} />
+            </div>
+          </div>
+          <button
+            onClick={() => downloadRangePDF(data, from, to)}
+            className="mt-4 self-start px-3 py-1.5 rounded-lg border border-[#0F6E56] text-[#0F6E56] text-xs font-medium hover:bg-[#E1F5EE]"
+          >
+            Download PDF
+          </button>
+        </div>
+
         <DownloadCard title="Repair data" sub="CSV export" button="Download CSV" onClick={() => downloadCSV(data)} />
         <DownloadCard
           title="Sustainability certificate"
@@ -194,7 +241,6 @@ export function ReportDownloads({ data }: { data: ReportData }) {
           button="Download PDF"
           onClick={() => downloadSustainabilityCert(data)}
         />
-        <DownloadCard title="Year-to-date summary" sub={ytdLabel} button="Download PDF" onClick={() => downloadYTD(data)} />
       </section>
 
       <section className="bg-white border border-black/10 rounded-xl p-5">
@@ -220,6 +266,32 @@ export function ReportDownloads({ data }: { data: ReportData }) {
         </div>
       </section>
     </div>
+  )
+}
+
+function QuickRange({
+  label,
+  from,
+  to,
+  setFrom,
+  setTo,
+}: {
+  label: string
+  from: string
+  to: string
+  setFrom: (v: string) => void
+  setTo: (v: string) => void
+}) {
+  return (
+    <button
+      onClick={() => {
+        setFrom(from)
+        setTo(to)
+      }}
+      className="px-2 py-0.5 rounded text-[11px] text-gray-600 bg-gray-100 hover:bg-gray-200"
+    >
+      {label}
+    </button>
   )
 }
 

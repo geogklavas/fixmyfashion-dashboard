@@ -11,14 +11,11 @@ export const colors = {
   bgSecondary: '#f9fafb',
 }
 
+// 3 states only — aligned with the 3 real statuses in detectStatus().
 export const statusChip: Record<string, { bg: string; fg: string }> = {
-  'Quote sent': { bg: '#FAEEDA', fg: '#BA7517' },
-  Confirmed: { bg: '#FAEEDA', fg: '#BA7517' },
-  Received: { bg: '#FAEEDA', fg: '#BA7517' },
-  'In progress': { bg: '#E6F1FB', fg: '#185FA5' },
-  'QA complete': { bg: '#E1F5EE', fg: '#0F6E56' },
-  Dispatched: { bg: '#EEEDFE', fg: '#534AB7' },
-  Delivered: { bg: '#E1F5EE', fg: '#0F6E56' },
+  'Quote sent': { bg: '#F1EFE8', fg: '#5F5E5A' },
+  'In workshop': { bg: '#E6F1FB', fg: '#185FA5' },
+  Dispatched: { bg: '#E1F5EE', fg: '#0F6E56' },
   Pending: { bg: '#f3f4f6', fg: '#6b7280' },
 }
 
