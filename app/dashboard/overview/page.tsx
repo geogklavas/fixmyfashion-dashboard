@@ -9,15 +9,20 @@ import {
   pipelineCounts,
   thisMonthCount,
 } from '@/lib/data'
+import { getLaunchChecklist, isLaunchComplete } from '@/lib/launch-checklist'
 import { KpiCard } from '@/components/ui/KpiCard'
 import { PipelinePill } from '@/components/dashboard/PipelinePill'
 import { VolumeLineChart } from '@/components/charts/VolumeLineChart'
+import { LaunchChecklistBanner } from '@/components/dashboard/LaunchChecklistBanner'
 
 export const dynamic = 'force-dynamic'
 
 export default async function OverviewPage() {
   const session = await getSession()
-  const orders = await getOrders(session!.brandHandle)
+  const [orders, checklist] = await Promise.all([
+    getOrders(session!.brandHandle),
+    getLaunchChecklist(session!.brandHandle),
+  ])
 
   const thisMonth = thisMonthCount(orders)
   const lastMonth = lastMonthCount(orders)
@@ -37,6 +42,7 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      {!isLaunchComplete(checklist) && <LaunchChecklistBanner checklist={checklist} />}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Repairs this month"

@@ -1,19 +1,36 @@
 import { getSession } from '@/lib/auth'
 import { getConfig } from '@/lib/data'
+import { getLaunchChecklist } from '@/lib/launch-checklist'
 import { PortalQR } from '@/components/dashboard/PortalQR'
-import { CategoryToggles } from '@/components/dashboard/CategoryToggles'
 
 export const dynamic = 'force-dynamic'
 
+const CHECKLIST_ITEMS: { key: 'footerDone' | 'emailDone' | 'packagingDone'; label: string }[] = [
+  { key: 'footerDone', label: 'Footer link added to brand website' },
+  { key: 'emailDone', label: 'Post-purchase email live' },
+  { key: 'packagingDone', label: 'Packaging insert ordered' },
+]
+
 export default async function SettingsPage() {
   const session = await getSession()
-  const config = await getConfig(session!.brandHandle)
+  const [config, checklist] = await Promise.all([
+    getConfig(session!.brandHandle),
+    getLaunchChecklist(session!.brandHandle),
+  ])
 
   const liveSince = new Date('2026-04-15').toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   })
+
+  const nextReview = checklist.nextReviewDate
+    ? new Date(checklist.nextReviewDate).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : 'Not scheduled yet'
 
   return (
     <div className="space-y-8">
@@ -45,25 +62,79 @@ export default async function SettingsPage() {
       </section>
 
       <section className="bg-white border border-black/10 rounded-xl p-5">
+        <h2 className="text-sm font-medium text-gray-700 mb-1">Brand launch checklist</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          FixMyFashion completes these on your behalf and marks them here as they go live.
+        </p>
+        <ul className="space-y-2">
+          {CHECKLIST_ITEMS.map((item) => {
+            const done = checklist[item.key]
+            return (
+              <li key={item.key} className="flex items-center gap-3 text-sm">
+                <span
+                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
+                    done ? 'bg-[#0F6E56] text-white' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {done ? '✓' : '·'}
+                </span>
+                <span className={done ? 'text-[#1a1a1a]' : 'text-gray-500'}>{item.label}</span>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section className="bg-white border border-black/10 rounded-xl p-5">
         <h2 className="text-sm font-medium text-gray-700 mb-1">Allowed repair categories</h2>
         <p className="text-xs text-gray-500 mb-4">
-          Toggle categories and request an update. Changes are reviewed by FixMyFashion before going live.
+          Services covered by your repair programme.
         </p>
-        <CategoryToggles initial={config.allowedCategories} />
+        {config.allowedCategories.length === 0 ? (
+          <div className="text-xs text-gray-400">No categories configured yet.</div>
+        ) : (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {config.allowedCategories.map((cat) => (
+              <span
+                key={cat}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-[#E1F5EE] text-[#0F6E56] border border-[#5DCAA5]/30"
+              >
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-500">
+          Need to change? Contact{' '}
+          <a href="mailto:hello@fixmyfashion.gr" className="text-[#0F6E56] font-medium hover:underline">
+            hello@fixmyfashion.gr
+          </a>
+          .
+        </p>
       </section>
 
       <section className="bg-white border border-black/10 rounded-xl p-5 space-y-5">
         <h2 className="text-sm font-medium text-gray-700">Support</h2>
         <Row label="Account manager" hint="Giorgos Gklavas · FixMyFashion">
-          <a
-            href="mailto:hello@fixmyfashion.gr"
-            className="text-[#0F6E56] text-sm font-medium hover:underline"
-          >
-            Contact
-          </a>
+          <div className="flex gap-3 items-center">
+            <a
+              href="mailto:hello@fixmyfashion.gr"
+              className="text-[#0F6E56] text-sm font-medium hover:underline"
+            >
+              Contact
+            </a>
+            <a
+              href="https://calendly.com/fixmyfashion/quarterly-review"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#0F6E56] text-sm font-medium hover:underline"
+            >
+              Book a call
+            </a>
+          </div>
         </Row>
         <Row label="Next quarterly review" hint="Scheduled with your account manager">
-          <span className="text-sm text-[#1a1a1a]">July 2026</span>
+          <span className="text-sm text-[#1a1a1a]">{nextReview}</span>
         </Row>
       </section>
     </div>
