@@ -2,6 +2,9 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import { cookies } from 'next/headers'
 
 export const SESSION_COOKIE = 'fmf_session'
+// When admin impersonates a brand, we stash their original token here so they
+// can pop back to /admin without re-authenticating.
+export const ADMIN_RETURN_COOKIE = 'fmf_admin_return'
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30 // 30 days
 
 export type SessionRole = 'brand' | 'admin'
@@ -11,6 +14,7 @@ export interface BrandSession extends JWTPayload {
   brandName: string
   brandEmail: string
   role?: SessionRole
+  impersonating?: boolean // true when admin is viewing this brand
 }
 
 function getSecret(): Uint8Array {

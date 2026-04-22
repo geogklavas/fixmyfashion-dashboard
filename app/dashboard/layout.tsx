@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { getConfig, isUsingMockData } from '@/lib/data'
 import { Header } from '@/components/dashboard/Header'
 import { TabNav } from '@/components/dashboard/TabNav'
+import { ImpersonationBanner } from '@/components/dashboard/ImpersonationBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-[#f9fafb]">
+      {session.impersonating && <ImpersonationBanner brandName={config.brandName} />}
       <Header brandName={config.brandName} primaryColor={primary} />
       <TabNav primaryColor={primary} />
       {isUsingMockData() && (

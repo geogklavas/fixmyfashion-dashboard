@@ -11,19 +11,22 @@ import {
 } from '@/lib/data'
 import { getLaunchChecklist, isLaunchComplete } from '@/lib/launch-checklist'
 import { getStoreRating } from '@/lib/judgeme'
+import { getConfig } from '@/lib/data'
 import { KpiCard } from '@/components/ui/KpiCard'
 import { PipelinePill } from '@/components/dashboard/PipelinePill'
 import { VolumeLineChart } from '@/components/charts/VolumeLineChart'
 import { LaunchChecklistBanner } from '@/components/dashboard/LaunchChecklistBanner'
+import { NoRepairsYet } from '@/components/dashboard/NoRepairsYet'
 
 export const dynamic = 'force-dynamic'
 
 export default async function OverviewPage() {
   const session = await getSession()
-  const [orders, checklist, rating] = await Promise.all([
+  const [orders, checklist, rating, config] = await Promise.all([
     getOrders(session!.brandHandle),
     getLaunchChecklist(session!.brandHandle),
     getStoreRating(),
+    getConfig(session!.brandHandle),
   ])
 
   const thisMonth = thisMonthCount(orders)
@@ -86,10 +89,14 @@ export default async function OverviewPage() {
         </div>
       </section>
 
-      <section className="bg-white border border-black/10 rounded-xl p-5">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Monthly repair volume</h3>
-        <VolumeLineChart data={volume} />
-      </section>
+      {orders.length === 0 ? (
+        <NoRepairsYet portalUrl={config.portalUrl} />
+      ) : (
+        <section className="bg-white border border-black/10 rounded-xl p-5">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Monthly repair volume</h3>
+          <VolumeLineChart data={volume} />
+        </section>
+      )}
     </div>
   )
 }

@@ -1,9 +1,12 @@
+import { Fragment } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getOrders, thisMonthCount } from '@/lib/data'
 import { ShopifyDiagnostic } from '@/components/dashboard/ShopifyDiagnostic'
 import { BrandConfigDiagnostic } from '@/components/dashboard/BrandConfigDiagnostic'
+import { BrandChecklistRow } from '@/components/dashboard/BrandChecklistRow'
+import { ImpersonateButton } from '@/components/dashboard/ImpersonateButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +16,10 @@ type BrandRow = {
   brand_email: string
   last_login_at: string | null
   role: string | null
+  launch_footer_done: boolean | null
+  launch_email_done: boolean | null
+  launch_packaging_done: boolean | null
+  next_review_date: string | null
 }
 
 type CategoryRequest = {
@@ -38,7 +45,9 @@ export default async function AdminPage() {
   const sb = supabaseAdmin()
   const { data: brands } = await sb
     .from('brand_sessions')
-    .select('brand_handle, brand_name, brand_email, last_login_at, role')
+    .select(
+      'brand_handle, brand_name, brand_email, last_login_at, role, launch_footer_done, launch_email_done, launch_packaging_done, next_review_date',
+    )
     .order('brand_name', { ascending: true })
 
   const { data: requests } = await sb
@@ -49,7 +58,6 @@ export default async function AdminPage() {
 
   const brandList = ((brands ?? []) as BrandRow[]).filter((b) => b.role !== 'admin')
 
-  // Aggregate repair stats per brand (uses mock fallback if Shopify not configured)
   const brandStats = await Promise.all(
     brandList.map(async (b) => {
       const orders = await getOrders(b.brand_handle)
@@ -60,6 +68,13 @@ export default async function AdminPage() {
         lastLogin: b.last_login_at,
         totalRepairs: orders.length,
         thisMonth: thisMonthCount(orders),
+        checklist: {
+          brandHandle: b.brand_handle,
+          footerDone: !!b.launch_footer_done,
+          emailDone: !!b.launch_email_done,
+          packagingDone: !!b.launch_packaging_done,
+          nextReviewDate: b.next_review_date ?? null,
+        },
       }
     }),
   )
@@ -98,16 +113,18 @@ export default async function AdminPage() {
 
         <section>
           <h1 className="text-xl font-semibold text-[#1a1a1a] mb-1">All brands</h1>
-          <p className="text-sm text-gray-500 mb-4">{brandStats.length} brand(s) active.</p>
+          <p className="text-sm text-gray-500 mb-4">
+            {brandStats.length} brand(s) active. Toggle launch checklist + set next review date inline.
+          </p>
           <div className="bg-white border border-black/10 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-4 py-2.5 font-medium">Brand</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Email</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Total repairs</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Repairs</th>
                   <th className="text-right px-4 py-2.5 font-medium">This month</th>
                   <th className="text-left px-4 py-2.5 font-medium">Last login</th>
+                  <th className="text-left px-4 py-2.5 font-medium w-[1%] whitespace-nowrap">View</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
@@ -119,15 +136,27 @@ export default async function AdminPage() {
                   </tr>
                 )}
                 {brandStats.map((b) => (
-                  <tr key={b.handle} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-[#1a1a1a]">{b.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{b.email}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{b.totalRepairs}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{b.thisMonth}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {b.lastLogin ? new Date(b.lastLogin).toLocaleDateString('en-GB') : 'Never'}
-                    </td>
-                  </tr>
+                  <Fragment key={b.handle}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-[#1a1a1a]">{b.name}</div>
+                        <div className="text-xs text-gray-500">{b.email}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{b.totalRepairs}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{b.thisMonth}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {b.lastLogin ? new Date(b.lastLogin).toLocaleDateString('en-GB') : 'Never'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <ImpersonateButton brandHandle={b.handle} />
+                      </td>
+                    </tr>
+                    <tr className="bg-gray-50/40">
+                      <td colSpan={5} className="px-4 py-2">
+                        <BrandChecklistRow initial={b.checklist} />
+                      </td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
