@@ -106,8 +106,8 @@ export default async function SettingsPage() {
         )}
         <p className="text-xs text-gray-500">
           Need to change? Contact{' '}
-          <a href="mailto:hello@fixmyfashion.gr" className="text-[#0F6E56] font-medium hover:underline">
-            hello@fixmyfashion.gr
+          <a href="mailto:support@fixmyfashion.gr" className="text-[#0F6E56] font-medium hover:underline">
+            support@fixmyfashion.gr
           </a>
           .
         </p>
@@ -118,7 +118,7 @@ export default async function SettingsPage() {
         <Row label="Account manager" hint="Giorgos Gklavas · FixMyFashion">
           <div className="flex gap-3 items-center">
             <a
-              href="mailto:hello@fixmyfashion.gr"
+              href="mailto:support@fixmyfashion.gr"
               className="text-[#0F6E56] text-sm font-medium hover:underline"
             >
               Contact

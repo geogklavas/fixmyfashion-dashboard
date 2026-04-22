@@ -10,6 +10,7 @@ import {
   thisMonthCount,
 } from '@/lib/data'
 import { getLaunchChecklist, isLaunchComplete } from '@/lib/launch-checklist'
+import { getStoreRating } from '@/lib/judgeme'
 import { KpiCard } from '@/components/ui/KpiCard'
 import { PipelinePill } from '@/components/dashboard/PipelinePill'
 import { VolumeLineChart } from '@/components/charts/VolumeLineChart'
@@ -19,9 +20,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function OverviewPage() {
   const session = await getSession()
-  const [orders, checklist] = await Promise.all([
+  const [orders, checklist, rating] = await Promise.all([
     getOrders(session!.brandHandle),
     getLaunchChecklist(session!.brandHandle),
+    getStoreRating(),
   ])
 
   const thisMonth = thisMonthCount(orders)
@@ -61,8 +63,12 @@ export default async function OverviewPage() {
         />
         <KpiCard
           label="FMF service rating"
-          value="—"
-          sub="FixMyFashion service rating · Judge.me wiring pending"
+          value={rating ? `${rating.average.toFixed(1)} ★` : '—'}
+          sub={
+            rating
+              ? `FixMyFashion service rating · ${rating.count.toLocaleString()} reviews`
+              : 'FixMyFashion service rating · Judge.me wiring pending'
+          }
         />
         <KpiCard
           label="Avg turnaround"
