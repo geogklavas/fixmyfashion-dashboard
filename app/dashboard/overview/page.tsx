@@ -74,8 +74,9 @@ export default async function OverviewPage() {
       <section>
         <h2 className="text-sm font-medium text-gray-700 mb-3">Active pipeline</h2>
         <div className="flex flex-wrap gap-3">
+          <PipelinePill count={pipeline.orders} label="Orders" color="#6b7280" />
           <PipelinePill count={pipeline.inWorkshop} label="In workshop" color="#185FA5" />
-          <PipelinePill count={pipeline.returningRecently} label="Returning to customers" color="#0F6E56" />
+          <PipelinePill count={pipeline.delivered} label="Delivered" color="#0F6E56" />
         </div>
       </section>
 

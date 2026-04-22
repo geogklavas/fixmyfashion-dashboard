@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getOrders, thisMonthCount } from '@/lib/data'
 import { ShopifyDiagnostic } from '@/components/dashboard/ShopifyDiagnostic'
+import { BrandConfigDiagnostic } from '@/components/dashboard/BrandConfigDiagnostic'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,6 +94,7 @@ export default async function AdminPage() {
         </section>
 
         <ShopifyDiagnostic />
+        <BrandConfigDiagnostic />
 
         <section>
           <h1 className="text-xl font-semibold text-[#1a1a1a] mb-1">All brands</h1>

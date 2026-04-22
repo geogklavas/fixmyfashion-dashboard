@@ -65,24 +65,26 @@ function inMonth(date: Date, year: number, month: number): boolean {
   return date.getFullYear() === year && date.getMonth() === month
 }
 
-// ---------- Pipeline (2 counters) ----------
+// ---------- Pipeline (3 counters per SPEC §2.2) ----------
+// Orders: every brand order (all statuses)
+// In workshop: tag repair-in-progress + fulfillments empty
+// Delivered: fulfillments not empty (Fulfilled status)
 
 export function pipelineCounts(orders: ShopifyOrder[]): {
+  orders: number
   inWorkshop: number
-  returningRecently: number
+  delivered: number
 } {
   let inWorkshop = 0
-  let returningRecently = 0
+  let delivered = 0
   for (const o of orders) {
     if (o.fulfillments.length > 0) {
-      // Returning to customers = fulfilled in last 10 days
-      const age = (Date.now() - new Date(o.fulfillments[0].createdAt).getTime()) / 86_400_000
-      if (age <= 10) returningRecently++
+      delivered++
       continue
     }
     if (o.tags.includes('repair-in-progress')) inWorkshop++
   }
-  return { inWorkshop, returningRecently }
+  return { orders: orders.length, inWorkshop, delivered }
 }
 
 // ---------- This / last month (Fulfilled-based) ----------

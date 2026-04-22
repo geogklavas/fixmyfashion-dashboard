@@ -174,6 +174,56 @@ type BrandConfigResponse = {
   }
 }
 
+// Parse the allowed_categories field. Shopify stores it either as a comma-
+// separated string ("pants, jackets") or as a JSON-encoded list (`["pants","jackets"]`)
+// depending on whether the metaobject field is text or list.text. Handle both.
+export function parseAllowedCategories(raw: string | undefined | null): string[] {
+  if (!raw) return []
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim()).filter(Boolean)
+      }
+    } catch {
+      // fall through to comma-split
+    }
+  }
+  return trimmed.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+export type BrandConfigDiagnostic = {
+  matchedHandle: string | null
+  candidateHandles: string[]
+  rawFields: Record<string, string> | null
+  parsedConfig: BrandConfig | null
+}
+
+// Returns BOTH the parsed config and a diagnostic snapshot. Used by the
+// /api/admin/brandconfig-diagnostic endpoint to debug the wrong-categories bug.
+export async function getBrandConfigDiagnostic(brandHandle: string): Promise<BrandConfigDiagnostic> {
+  const data = await shopifyQuery<BrandConfigResponse>(BRAND_CONFIG_QUERY)
+  const candidates: string[] = []
+  for (const edge of data.metaobjects.edges) {
+    const fields = Object.fromEntries(edge.node.fields.map((f) => [f.key, f.value]))
+    candidates.push(fields.brand_handle ?? '(missing)')
+    if (fields.brand_handle === brandHandle) {
+      const parsed: BrandConfig = {
+        brandHandle: fields.brand_handle ?? brandHandle,
+        brandName: fields.brand_name ?? brandHandle,
+        brandLogo: fields.brand_logo ?? '',
+        primaryColor: fields.primary_color ?? '#0F6E56',
+        portalUrl: fields.portal_url ?? '',
+        allowedCategories: parseAllowedCategories(fields.allowed_categories),
+        discountCode: fields.discount_code ? fields.discount_code : null,
+      }
+      return { matchedHandle: fields.brand_handle, candidateHandles: candidates, rawFields: fields, parsedConfig: parsed }
+    }
+  }
+  return { matchedHandle: null, candidateHandles: candidates, rawFields: null, parsedConfig: null }
+}
+
 export async function getBrandConfig(brandHandle: string): Promise<BrandConfig | null> {
   const data = await shopifyQuery<BrandConfigResponse>(BRAND_CONFIG_QUERY)
   for (const edge of data.metaobjects.edges) {
@@ -185,10 +235,7 @@ export async function getBrandConfig(brandHandle: string): Promise<BrandConfig |
         brandLogo: fields.brand_logo ?? '',
         primaryColor: fields.primary_color ?? '#0F6E56',
         portalUrl: fields.portal_url ?? '',
-        allowedCategories: (fields.allowed_categories ?? '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        allowedCategories: parseAllowedCategories(fields.allowed_categories),
         discountCode: fields.discount_code ? fields.discount_code : null,
       }
     }
