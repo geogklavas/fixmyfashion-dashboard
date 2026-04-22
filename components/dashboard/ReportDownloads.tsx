@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import jsPDF from 'jspdf'
-import { detectGarmentType, detectRepairType, formatFullDate } from '@/lib/tokens'
+import { formatFullDate } from '@/lib/tokens'
 import type { LogRow } from './RepairLogTable'
 
 type ReportData = {
@@ -35,15 +35,14 @@ function csvEscape(v: string | number): string {
 }
 
 function downloadCSV(data: ReportData) {
-  const headers = ['Order ID', 'Date', 'Garment', 'Repair type', 'Status', 'Price (EUR)']
+  const headers = ['Order ID', 'Date', 'Repair', 'Status', 'Price (EUR)']
   const lines = [headers.join(',')]
   for (const r of data.rows) {
     lines.push(
       [
         `#FMF-${r.orderName.replace('#', '').slice(-4)}`,
         formatFullDate(r.createdAt),
-        detectGarmentType(r.productTitle),
-        detectRepairType(r.productTitle),
+        r.productTitle,
         r.status,
         parseFloat(r.price).toFixed(2),
       ]
@@ -119,11 +118,10 @@ function buildPDF(data: ReportData, title: string, subtitle: string): jsPDF {
       doc.addPage()
       y = 60
     }
-    const garment = detectGarmentType(r.productTitle)
-    const title = r.productTitle.length > 30 ? r.productTitle.slice(0, 30) + '…' : r.productTitle
+    const title = r.productTitle.length > 40 ? r.productTitle.slice(0, 40) + '…' : r.productTitle
     doc.text(`#FMF-${r.orderName.replace('#', '').slice(-4)}`, colX[0], y)
     doc.text(formatFullDate(r.createdAt), colX[1], y)
-    doc.text(`${garment} · ${title}`, colX[2], y)
+    doc.text(title, colX[2], y)
     doc.text(r.status, colX[3], y)
     doc.text(`€${parseFloat(r.price).toFixed(0)}`, colX[4], y)
     y += 14

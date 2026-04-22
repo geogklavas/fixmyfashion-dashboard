@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { StatusChip } from './StatusChip'
-import { detectGarmentType, formatFullDate, formatRelative } from '@/lib/tokens'
+import { formatFullDate, formatRelative } from '@/lib/tokens'
 
 export type LogRow = {
   id: string
@@ -117,8 +117,7 @@ export function RepairLogTable({ rows }: { rows: LogRow[] }) {
               )}
               {slice.map((r) => {
                 const lastFour = r.orderName.replace('#', '').slice(-4)
-                const garment = detectGarmentType(r.productTitle)
-                const full = r.productTitle.length > 30 ? r.productTitle.slice(0, 30) + '…' : r.productTitle
+                const full = r.productTitle.length > 40 ? r.productTitle.slice(0, 40) + '…' : r.productTitle
                 const days = r.status === 'In workshop' ? daysInWorkshop(r.createdAt) : null
                 return (
                   <tr key={r.id} className="hover:bg-gray-50">
@@ -127,12 +126,6 @@ export function RepairLogTable({ rows }: { rows: LogRow[] }) {
                       <span title={formatFullDate(r.createdAt)}>{formatRelative(r.createdAt)}</span>
                     </Td>
                     <Td>
-                      <span
-                        className="inline-block w-8 text-center text-[10px] font-bold text-gray-600 bg-gray-100 rounded px-1.5 py-0.5 mr-2"
-                        title={garment}
-                      >
-                        {garment}
-                      </span>
                       <span className="text-gray-700" title={r.productTitle}>
                         {full}
                       </span>

@@ -23,10 +23,9 @@ export default async function SustainabilityPage() {
         <p className="text-sm text-gray-500">Environmental impact of your repair programme.</p>
       </div>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <KpiCard label="🌿 CO₂ saved" value={`${totals.co2Kg.toLocaleString()} kg`} sub="vs replacement" />
         <KpiCard label="👕 Garments kept in use" value={totals.completed.toLocaleString()} sub="Delivered to customer" />
-        <KpiCard label="📉 Re-repair rate" value={`${totals.rerepairRate}%`} sub="Lower is better" />
       </section>
 
       <p className="text-xs text-gray-500 leading-relaxed max-w-3xl">

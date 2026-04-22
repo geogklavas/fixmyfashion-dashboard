@@ -263,20 +263,83 @@ export function jobCategoryBreakdown(orders: ShopifyOrder[]): { category: string
   return JOB_CATEGORIES.map((c) => ({ category: c, count: counts[c] ?? 0 })).filter((r) => r.count > 0)
 }
 
-// Inner ring = job-type-* breakdown (repairs + alterations only, per spec).
-export function jobTypeBreakdown(orders: ShopifyOrder[]): { type: string; label: string; count: number; category: string }[] {
-  const counts = new Map<string, { category: string; count: number }>()
+// Per SPEC §3.2 Section 2: separate breakdowns per top-level category.
+
+export const REPAIR_JOB_TYPES = ['repair-seam', 'repair-button', 'repair-hole', 'repair-zipper', 'repair-else'] as const
+export const ALTERATION_JOB_TYPES = ['alter-height', 'alter-width', 'alter-else'] as const
+
+export function repairTypeBreakdown(
+  orders: ShopifyOrder[],
+): { type: string; label: string; count: number; share: number }[] {
+  const repairOrders = orders.filter((o) => jobCategoryOf(o.tags) === 'repair')
+  const counts: Record<string, number> = {}
+  for (const o of repairOrders) {
+    const t = jobTypeOf(o.tags)
+    if (!t.startsWith('repair-')) continue
+    counts[t] = (counts[t] ?? 0) + 1
+  }
+  const total = repairOrders.length || 1
+  return REPAIR_JOB_TYPES.filter((t) => counts[t])
+    .map((type) => ({
+      type,
+      label: JOB_TYPE_LABELS[type] ?? type,
+      count: counts[type],
+      share: Math.round((counts[type] / total) * 100),
+    }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function alterationTypeBreakdown(
+  orders: ShopifyOrder[],
+): { type: string; label: string; count: number; share: number }[] {
+  const alterationOrders = orders.filter((o) => jobCategoryOf(o.tags) === 'alteration')
+  const counts: Record<string, number> = {}
+  for (const o of alterationOrders) {
+    const t = jobTypeOf(o.tags)
+    if (!t.startsWith('alter-')) continue
+    counts[t] = (counts[t] ?? 0) + 1
+  }
+  const total = alterationOrders.length || 1
+  return ALTERATION_JOB_TYPES.filter((t) => counts[t])
+    .map((type) => ({
+      type,
+      label: JOB_TYPE_LABELS[type] ?? type,
+      count: counts[type],
+      share: Math.round((counts[type] / total) * 100),
+    }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function categoryOrderCount(orders: ShopifyOrder[], category: 'repair' | 'alteration'): number {
+  return orders.filter((o) => jobCategoryOf(o.tags) === category).length
+}
+
+// Counts and shares for the 4 service categories — used for Section 1 ranked cards.
+export function categoryCardData(
+  orders: ShopifyOrder[],
+): { category: string; label: string; count: number; share: number }[] {
+  const counts: Record<string, number> = { repair: 0, alteration: 0, cleaning: 0, colour: 0 }
+  let classified = 0
   for (const o of orders) {
     const cat = jobCategoryOf(o.tags)
-    if (cat !== 'repair' && cat !== 'alteration') continue
-    const t = jobTypeOf(o.tags)
-    const existing = counts.get(t)
-    if (existing) existing.count++
-    else counts.set(t, { category: cat, count: 1 })
+    if (cat in counts) {
+      counts[cat]++
+      classified++
+    }
   }
-  return Array.from(counts.entries())
-    .map(([type, { category, count }]) => ({ type, label: JOB_TYPE_LABELS[type] ?? type, count, category }))
-    .sort((a, b) => b.count - a.count)
+  const total = classified || 1
+  const labelOf: Record<string, string> = {
+    repair: 'Repair',
+    alteration: 'Alteration',
+    cleaning: 'Cleaning',
+    colour: 'Colour',
+  }
+  return JOB_CATEGORIES.map((cat) => ({
+    category: cat,
+    label: labelOf[cat] ?? cat,
+    count: counts[cat],
+    share: Math.round((counts[cat] / total) * 100),
+  })).sort((a, b) => b.count - a.count)
 }
 
 // Orders that have at least one job-cat-* tag. Used to gate Analytics widgets.
@@ -329,27 +392,9 @@ export function monthlyByCategory(
   })
 }
 
-// Garment hint from line item title (best effort, for product insights only).
-const GARMENT_LABELS: Record<string, string> = {
-  JN: 'Jeans',
-  JK: 'Jackets',
-  TR: 'Trousers',
-  SH: 'Shirts',
-  KW: 'Knitwear',
-  DR: 'Dresses',
-  '—': 'Other',
-}
-
-function detectGarmentFromTitle(title: string): string {
-  const t = title.toLowerCase()
-  if (t.includes('jean') || t.includes('denim')) return 'JN'
-  if (t.includes('jacket') || t.includes('coat') || t.includes('μπουφ') || t.includes('παλτ')) return 'JK'
-  if (t.includes('trouser') || t.includes('pant') || t.includes('παντ')) return 'TR'
-  if (t.includes('shirt') || t.includes('blouse') || t.includes('top') || t.includes('πουκ')) return 'SH'
-  if (t.includes('knit') || t.includes('wool') || t.includes('sweater') || t.includes('πλεκτ')) return 'KW'
-  if (t.includes('dress') || t.includes('skirt') || t.includes('φουστ') || t.includes('φορεμ')) return 'DR'
-  return '—'
-}
+// Garment detection from product title was REMOVED in Sprint 6 — unreliable
+// across Greek/English titles and frequently mislabeled. Job classification
+// now lives entirely in job-cat-* / job-type-* tags applied at intake.
 
 // ---------- Regional breakdown (Analytics stat block, no map) ----------
 
@@ -385,25 +430,6 @@ export function regionBreakdown(orders: ShopifyOrder[]): {
   return { attica, centralMacedonia, rest, total }
 }
 
-// ---------- Product insights (garment × job-type, Fulfilled only) ----------
-
-export function productInsights(
-  orders: ShopifyOrder[],
-): { garment: string; repair: string; count: number; share: number }[] {
-  const source = fulfilledOrders(orders)
-  const combos = new Map<string, { garment: string; repair: string; count: number }>()
-  for (const o of source) {
-    const title = o.lineItems[0]?.title ?? ''
-    const garment = GARMENT_LABELS[detectGarmentFromTitle(title)]
-    const repair = JOB_TYPE_LABELS[jobTypeOf(o.tags)] ?? 'Other'
-    const key = `${garment}__${repair}`
-    const existing = combos.get(key)
-    if (existing) existing.count++
-    else combos.set(key, { garment, repair, count: 1 })
-  }
-  const total = source.length || 1
-  return Array.from(combos.values())
-    .map((c) => ({ ...c, share: Math.round((c.count / total) * 100) }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-}
+// productInsights removed in Sprint 6 — replaced by Section 1 (categoryCardData)
+// + Section 2 (repairTypeBreakdown / alterationTypeBreakdown) on the Analytics
+// tab. Garment hint from product title was unreliable.

@@ -28,27 +28,9 @@ export const DASHBOARD_TABS = [
   { slug: 'settings', label: 'Settings' },
 ] as const
 
-export function detectGarmentType(productTitle: string): string {
-  const t = productTitle.toLowerCase()
-  if (t.includes('jean') || t.includes('denim')) return 'JN'
-  if (t.includes('jacket') || t.includes('coat')) return 'JK'
-  if (t.includes('trouser') || t.includes('pant')) return 'TR'
-  if (t.includes('shirt') || t.includes('blouse') || t.includes('top')) return 'SH'
-  if (t.includes('knit') || t.includes('wool') || t.includes('sweater')) return 'KW'
-  if (t.includes('dress') || t.includes('skirt')) return 'DR'
-  return '—'
-}
-
-export function detectRepairType(productTitle: string): string {
-  const t = productTitle.toLowerCase()
-  if (t.includes('zip')) return 'Zip'
-  if (t.includes('hem')) return 'Hem'
-  if (t.includes('seam')) return 'Seam'
-  if (t.includes('button')) return 'Button'
-  if (t.includes('knit') || t.includes('darn')) return 'Knitwear'
-  if (t.includes('waist') || t.includes('alter')) return 'Alteration'
-  return 'Other'
-}
+// detectGarmentType / detectRepairType removed in Sprint 6 — product-title
+// keyword parsing was unreliable. Service classification now reads
+// job-cat-* / job-type-* tags only.
 
 export function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
