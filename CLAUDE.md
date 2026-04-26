@@ -226,12 +226,13 @@ Do NOT filter by brand tag — not supported.
 
 ### Tab 1: Overview
 - 4 KPI cards: repairs this month (+MoM% delta) | all-time repairs | FMF service rating (Judge.me store avg) | avg turnaround days
-- 2 pipeline counters: "In workshop" (repair-in-progress, not Fulfilled) | "Returning to customers" (Fulfilled, last 10 days)
+- 3 pipeline counters: "Orders" (all orders tagged repair-b2b-[brandHandle], gray #6b7280) | "In workshop" (repair-in-progress, not Fulfilled, blue #185FA5) | "Delivered" (Fulfilled, teal #0F6E56)
 - Line chart: monthly volume — Fulfilled orders by month, last 6 months
 - Brand launch checklist callout if touchpoints incomplete (footer / post-purchase email / packaging)
 
 ### Tab 2: Sustainability
-- 3 KPI cards: CO2 saved (kg) | Garments kept in use | Re-repair rate %
+- 2 KPI cards: CO2 saved (kg) | Garments kept in use
+  (Re-repair rate moved to Analytics tab — single home for the metric)
 - Cumulative CO2 bar chart: Fulfilled orders × 3kg, running total by month
 - Downloadable badge: PNG (300dpi) + SVG, co-branded with brand stats
 - Benchmark note: "~3 kg CO₂ saved per garment repaired vs replaced (WRAP UK)"
@@ -245,9 +246,21 @@ Do NOT filter by brand tag — not supported.
 
 ### Tab 4: Analytics
 - KPI cards: Repeat repair customers % | Re-repair rate % | % delivered within 7 days
-- Donut chart: job-cat-* outer ring (4 categories) + job-type-* inner ring (repair + alteration types). Gate: <10 tagged orders → show placeholder.
+
+- Section 1 — Service category (job-cat-* tags):
+  Ranked cards for the 4 categories: repair / alteration / cleaning / colour
+  Each card: name + count + % + progress bar
+  Gate: <10 classified orders → "Service mix available from 10 classified orders"
+  Garment-from-title detection removed entirely (unreliable).
+
+- Section 2 — Job type breakdown, TWO ranked lists:
+  Chart A — Repair types (job-type-repair-* only): seam / button / hole / zipper / other
+    Only orders tagged job-cat-repair. Gate: <5 repair orders → placeholder.
+  Chart B — Alteration types (job-type-alter-* only): height / width / other
+    Only orders tagged job-cat-alteration. Gate: <5 alteration orders → placeholder.
+  Cleaning + colour: no type breakdown — Section 1 only.
+
 - Monthly stacked bar: orders by job-cat-* per month, last 6 months. Gate: <50 repairs/month → placeholder.
-- Product insights cards: top garment × job-type combinations, top 6 by frequency, with progress bar.
 - Regional breakdown: % Attica / % Central Macedonia / % Rest (from shippingAddress.city)
 - Satisfaction trend: gated at 50+ total reviews; below threshold show avg rating only.
 
@@ -258,7 +271,7 @@ Do NOT filter by brand tag — not supported.
 ### Tab 6: Settings
 - Portal URL (read-only, one-click copy)
 - QR code download (PNG + SVG)
-- Allowed categories: read-only list + "Request change → hello@fixmyfashion.gr"
+- Allowed categories: read-only list + "Request change → support@fixmyfashion.gr"
 - Brand launch checklist: footer link ✓ | post-purchase email ✓ | packaging insert ✓ (set by FMF in Supabase)
 - Account manager: Giorgos Gklavas + Calendly link
 - Next quarterly review date

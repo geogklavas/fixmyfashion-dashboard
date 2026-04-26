@@ -48,7 +48,26 @@ Sprint 5 (Real-data tuning + spec alignment)                              [DONE 
   launch_packaging_done, next_review_date, report_preference                DONE
 - Judge.me service rating wiring                                            DEFERRED to Sprint 6
 
-Sprint 6 (next session): TBD — user will define at session start
+Sprint 6 (Real-data polish + admin tooling)                              [DONE 2026-04-26]
+- S6-C1 customerEmail wired through GraphQL + repeat-customer rate         DONE
+- S6-C2 Overview pipeline expanded to 3 counters (Orders / In workshop / Delivered) DONE
+- S6-C3 Analytics restructured: ranked category cards + 2 ranked type lists
+        (garment-from-title detection deleted)                              DONE
+- S6-C4 BrandConfig diagnostic + parseAllowedCategories handles JSON+CSV   DONE
+- S6-C5 Judge.me store-rating wiring on Overview                           DONE
+- S6-C6 Sustainability tab reduced to 2 cards; Re-repair moved to Analytics DONE
+- S6-C7 hello@fixmyfashion.gr → support@fixmyfashion.gr everywhere         DONE
+- S6-C8 Admin: per-brand launch-checklist editor (no SQL needed)           DONE
+- S6-C9 Admin: brand impersonation flow + exit banner                      DONE
+- S6-C10 Empty-state polish (NoRepairsYet, gated chart placeholders)       DONE
+- S6-C11 Microsoft Clarity snippet (env-gated by NEXT_PUBLIC_CLARITY_PROJECT_ID) DONE
+
+Carry-over (Shopify-side, not code):
+- S6-Y1 Create 12 job-cat-* / job-type-* tags in Shopify Admin             PENDING
+- S6-Y2 Shopify Flow: brand_source attr → repair-b2b-{value} tag           PENDING
+- S6-Y3 Backfill be-casual test orders with workflow + classification tags PENDING
+
+Sprint 7 (next session): TBD — user will define at session start
 ```
 
 ---
@@ -169,12 +188,13 @@ Notes:
 - Judge.me rating is store-level only (not per-brand). Label: "FixMyFashion service rating"
 - Turnaround: use order.createdAt → fulfillments[0].createdAt (Shopify does not expose tag timestamps)
 
-**Pipeline row (2 counters only):**
+**Pipeline row (3 counters):**
 
 | Counter | Source | Color |
 |---------|--------|-------|
+| Orders | All orders tagged repair-b2b-[brandHandle] | Gray #6b7280 |
 | In workshop | tag repair-in-progress + fulfillments empty | Blue #185FA5 |
-| Returning to customers | fulfillments not empty, last 10 days | Teal #0F6E56 |
+| Delivered | fulfillments not empty | Teal #0F6E56 |
 
 **Brand launch checklist callout:**
 Yellow banner if not all 3 touchpoints active:
@@ -232,15 +252,15 @@ Garment type badge: optional subtle secondary label only — not a primary colum
 
 ### 3.1 Sustainability Tab
 
-**Impact cards (3 cards):**
+**Impact cards (2 cards):**
 ```
 CO2 saved          Fulfilled orders × 3 kg                  kg
 Garments kept in use  Fulfilled orders count               count
-Re-repair rate     re-repairs ÷ total Fulfilled              %
 ```
 
 "Fulfilled orders" = orders where fulfillments array is not empty.
 Water saved removed — methodology not defensible for sustainability reports.
+Re-repair rate moved to Analytics tab (Sprint 6) — single home for the metric.
 
 **Benchmark note:**
 "~3 kg CO₂ saved per garment repaired vs replaced (WRAP UK, 2023)."
@@ -263,30 +283,31 @@ Water saved removed — methodology not defensible for sustainability reports.
 - Delivered within 7 days %: Fulfilled where (fulfillments[0].createdAt - createdAt) ≤ 7d ÷ total Fulfilled
   Display as "87% (26 of 30 repairs)". Flag amber if <80%.
 
-**Service breakdown donut:**
-Data source: job-cat-* and job-type-* tags — NOT product title keyword parsing.
+**Section 1 — Service category (ranked cards):**
+Data source: job-cat-* tags — NOT product title keyword parsing.
 
 ```typescript
-// Category from tags
 const category = tags.find(t => t.startsWith('job-cat-'))?.replace('job-cat-', '') ?? 'unknown'
-
-// Type from tags
-const jobType = tags.find(t => t.startsWith('job-type-'))?.replace('job-type-', '') ?? 'other'
 ```
 
-- Outer ring: 4 segments — repair / alteration / cleaning / colour (from job-cat-* tags)
-- Inner ring: job-type-* breakdown (repairs + alterations only)
+- Ranked cards for the 4 categories: repair / alteration / cleaning / colour
+- Each card: name + count + % + progress bar
 - Colors: teal (repair), blue (alteration), amber (cleaning), purple (colour)
-- Gate: show placeholder "Repair mix available from 10 classified orders" if <10 job-cat-* tagged orders
+- Gate: <10 classified orders → "Service mix available from 10 classified orders"
+
+**Section 2 — Job type breakdown (two ranked lists):**
+Data source: job-type-* tags. Cleaning + colour have NO type breakdown (Section 1 only).
+
+- Chart A — Repair types (job-cat-repair only): seam / button / hole / zipper / other
+  Gate: <5 repair orders → placeholder
+- Chart B — Alteration types (job-cat-alteration only): height / width / other
+  Gate: <5 alteration orders → placeholder
+
+Garment-from-title detection removed entirely (unreliable).
 
 **Monthly stacked bar:**
 - X: last 6 months; Y: order count; Stacked by job-cat-* (4 series)
 - Gate: placeholder if <50 repairs/month
-
-**Product insights cards:**
-- Top 6 job-type combinations by frequency
-- Each card: garment hint (from line item title, best effort) + job type (human-readable) + count + % + progress bar
-- Sort by count descending
 
 **Regional breakdown (simple stat block — no map):**
 - % Attica | % Central Macedonia | % Rest of Greece
@@ -343,7 +364,7 @@ Read-only status from Supabase (FMF marks these — not user-editable):
 
 **Section 3: Allowed repair categories**
 Read-only list of chips from BrandConfig allowedCategories.
-Below: "Need to change? Contact hello@fixmyfashion.gr"
+Below: "Need to change? Contact support@fixmyfashion.gr"
 NOT toggles. Do not call Shopify API. No "Request update" button.
 
 **Section 4: Support**
@@ -444,12 +465,13 @@ CREATE TABLE admin_sessions (
 - [ ] Login flow works end-to-end
 - [ ] Brand A cannot see Brand B's data
 - [ ] All 6 tabs load without console errors (no Map tab in nav)
-- [ ] Overview: 2 pipeline counters (In workshop + Returning to customers)
+- [ ] Overview: 3 pipeline counters (Orders + In workshop + Delivered)
 - [ ] Overview: repair counts match Shopify admin (Fulfilled orders)
+- [ ] Overview: Judge.me service rating renders (or "—" if env vars missing)
 - [ ] Repair Log: 3 status filter options + date range picker + search bar
 - [ ] Repair Log: no review score column, no repair type filter
-- [ ] Sustainability: CO2 calculated from Fulfilled orders × 3kg (not repair-delivered tag)
-- [ ] Analytics: donut reads job-cat-* tags (not product title keywords)
+- [ ] Sustainability: 2 cards only (CO2, Garments kept in use); Re-repair lives on Analytics
+- [ ] Analytics: ranked category cards (no donut) + 2 ranked type lists (repair / alteration)
 - [ ] Analytics: regional breakdown shows 3 stats (not a map)
 - [ ] Settings: categories shown as read-only list (not toggles)
 - [ ] Settings: launch checklist reads from Supabase
