@@ -64,7 +64,11 @@ Sprint 6 (Real-data polish + admin tooling)                              [DONE 2
 
 Carry-over (Shopify-side, not code):
 - S6-Y1 Create 12 job-cat-* / job-type-* tags in Shopify Admin             PENDING
-- S6-Y2 Shopify Flow: brand_source attr → repair-b2b-{value} tag           PENDING
+- S6-Y2 Shopify Flow: brand_source attr → repair-b2b-{value} tag           DONE 2026-04-27
+        Implemented as TWO active Flow rules (per-brand, not one dynamic Liquid rule):
+          • "Brand Repair tag"     — generic catch-all
+          • "Becasual Repair tag"  — be-casual specific
+        ⚠️ Each new brand needs a new Flow rule until consolidated into one Liquid rule.
 - S6-Y3 Backfill be-casual test orders with workflow + classification tags PENDING
 
 Sprint 7 (next session): TBD — user will define at session start

@@ -629,4 +629,14 @@ The 7 must-do tasks (S6-C1 → S6-C7) shipped across 5 grouped commits. Build is
 
 **Blockers:** none.
 
-**Deferred to next session (S6-C8…C11):** untouched per scope.
+(Sprint 6 "Bonus" tasks S6-C8…C11 are all DONE — see table above. Earlier draft note about them being deferred was stale.)
+
+### 2026-04-27 — Shopify carry-over progress
+
+- **S6-Y2 / F4c — DONE.** Two Shopify Flow rules created and active:
+  `Brand Repair tag` (catch-all) + `Becasual Repair tag` (be-casual specific).
+  Both trigger on Order created and apply `repair-b2b-{brand}`.
+  ⚠️ Per-brand approach (not the single dynamic Liquid rule originally specced) —
+  each future brand needs its own rule until consolidated.
+- **S6-Y1 / F4b — PENDING.** 12 job-cat-* / job-type-* tags still to create.
+- **S6-Y3 — PENDING.** Existing be-casual test orders still need backfill tags.

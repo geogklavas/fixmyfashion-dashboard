@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ephemeral sprint plan (regenerate per sprint)
+SPRINT_PLAN.md
