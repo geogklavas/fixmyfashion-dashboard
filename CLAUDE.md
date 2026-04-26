@@ -582,3 +582,38 @@ The dashboard query is `tag:repair-b2b-becasual`. Test orders in Shopify carry `
 1. Open repo in IDE; `npm run dev`.
 2. Read CLAUDE.md (root + repo copy) and the new SPEC.md "Sprint 6" section once user has populated it.
 3. User will define Sprint 6 scope at session start — do not assume.
+
+### 2026-04-26 — Sprint 6 (Session 3, must-do)
+
+**Repo:** https://github.com/geogklavas/fixmyfashion-dashboard
+**Live:** https://dashboard.fixmyfashion.gr
+**Last commit pushed:** `7aeda7c` (Sprint 6 Group 5: Microsoft Clarity)
+
+The 7 must-do tasks (S6-C1 → S6-C7) shipped across 5 grouped commits. Build is clean.
+
+| Task    | Commit    | What landed |
+|---------|-----------|-------------|
+| S6-C1   | `d667fa2` | `email` already in GetBrandRepairs query + `customerEmail` field on `ShopifyOrder`; `repeatCustomerRate` reads it. |
+| S6-C2   | `d667fa2` | `pipelineCounts()` returns `{ orders, inWorkshop, delivered }`; Overview pipeline pills replaced with 3 counters (gray Orders #6b7280 / blue In workshop #185FA5 / teal Delivered #0F6E56). |
+| S6-C3   | `3face3f` | Analytics restructured: garment-from-title detection deleted; Section 1 = `CategoryRankedCards` from `categoryCardData()`, gated <10 classified; Section 2 = two `TypeRankedList` charts (`repairTypeBreakdown` / `alterationTypeBreakdown`), gated <5; cleaning + colour are Section 1 only. |
+| S6-C4   | `d667fa2` | `parseAllowedCategories()` handles BOTH comma string and JSON list; `getBrandConfigDiagnostic()` exposes matched handle, candidate handles, raw fields, parsed config; `/api/admin/brandconfig-diagnostic` + `BrandConfigDiagnostic` admin panel let us inspect a brand's metaobject live. |
+| S6-C5   | `1936d1f` | `lib/judgeme.ts` `getStoreRating()` hits Judge.me `index_with_meta.json` (10-min server cache); Overview KPI shows `{avg} ★` + review count, label "FMF service rating / FixMyFashion service rating". Gracefully renders `—` when `JUDGEME_API_TOKEN` / `JUDGEME_SHOP_DOMAIN` env vars missing. No per-brand filter. |
+| S6-C6   | `1936d1f` | Sustainability tab: only CO₂ saved + Garments kept in use cards; Re-repair card lives on Analytics only. |
+| S6-C7   | `1936d1f` | All `hello@fixmyfashion.gr` mailto: links + hardcoded strings rebranded to `support@fixmyfashion.gr`; verified 0 occurrences in app/, components/, lib/. |
+
+**Bonus (out of must-do scope but already in this sprint):**
+- `4fe1a3d` (Group 4): admin features + empty-state polish (`NoRepairsYet`, `BrandChecklistRow`, brand impersonation via `/api/admin/impersonate` + exit, `ImpersonationBanner`).
+- `7aeda7c` (Group 5): Microsoft Clarity snippet wired in root layout, env-gated by `NEXT_PUBLIC_CLARITY_PROJECT_ID`.
+
+**Required env vars added this sprint:**
+- `JUDGEME_API_TOKEN`, `JUDGEME_SHOP_DOMAIN` — store rating
+- `NEXT_PUBLIC_CLARITY_PROJECT_ID` — optional Clarity wiring
+
+**End-of-session state:**
+- `npm run build` passes with 0 TypeScript errors, 0 lint errors.
+- Working tree clean; all commits already on `origin/main`.
+- be-casual still shows zeros until Shopify Flow auto-tags `repair-b2b-becasual` (carry-over from Session 2; not blocked by this sprint).
+
+**Blockers:** none.
+
+**Deferred to next session (S6-C8…C11):** untouched per scope.
