@@ -56,9 +56,11 @@ logo_url            URL       CDN URL to logo image (theme prefers this over `lo
 hero_image_url      URL       CDN URL to hero background image on brand portal
 brand_description   Text      Multi-line marketing copy shown on portal
 button_text         String    CTA button label on portal (currently misfilled — see I-R008)
-"allowed Categories" String   "category:pants, category:jackets, category:shirts, category:tops, category:hoodies"
-                              ⚠️ Field key has SPACE + CAPITAL C — breaks GraphQL by-key access
-                              Values have "category:" prefix that must be stripped client-side
+allowed_categories  String   "category:pants, category:jackets, category:shirts, category:tops, category:hoodies"
+                              Field KEY is snake_case (returned by GraphQL). Display name in
+                              Shopify Admin UI is "allowed Categories" (confusing). Filter by
+                              the KEY. Values have "category:" prefix that must be stripped
+                              client-side. See I-R011.
 ```
 
 **Dashboard code alias:** internally the TypeScript uses `brandHandle` as variable name; that maps FROM the `subdomain` metaobject field. Do not confuse the two — the field on Shopify is `subdomain`.
@@ -436,7 +438,7 @@ query GetBrandRepairs($brandHandle: String!, $cursor: String) {
 ```
 
 ### Fetch BrandConfig metaobject
-Type handle is `brandconfig` (one word, no underscore). Fetch all fields as `{ key value }` — DO NOT use structured field-by-name access because the `"allowed Categories"` field key contains a space and capital C which breaks GraphQL by-name field selection. Filter client-side by exact key match on `subdomain` (mapped to internal `brandHandle` alias).
+Type handle is `brandconfig` (one word, no underscore). Fetch all fields as `{ key value }` and filter client-side by technical key (snake_case, returned by GraphQL) — not by Shopify Admin display name. The field with display name "allowed Categories" has key `allowed_categories`. Filter client-side by exact key match on `subdomain` (mapped to internal `brandHandle` alias). See I-R011.
 ```graphql
 query GetBrandConfig {
   metaobjects(type: "brandconfig", first: 50) {
@@ -462,7 +464,7 @@ interface BrandConfig {
   heroImageUrl: string      // CDN URL, from hero_image_url
   brandDescription: string  // from brand_description
   buttonText: string        // from button_text
-  allowedCategories: string[]  // from "allowed Categories", category: prefix stripped
+  allowedCategories: string[]  // from allowed_categories key (Admin display: "allowed Categories"), category: prefix stripped
 }
 ```
 

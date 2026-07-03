@@ -163,9 +163,10 @@ export async function getBrandOrders(brandHandle: string): Promise<ShopifyOrder[
 }
 
 // Metaobject type handle is `brandconfig` (one word, no underscore).
-// Fields are fetched as `{ key value }` array — DO NOT switch to structured
-// field-by-name access: the `"allowed Categories"` field key contains a space
-// and capital C, which breaks GraphQL by-name field selection.
+// Fields are fetched as `{ key value }` array so the mapper can filter
+// client-side by technical key (snake_case) rather than display name.
+// The field with display name "allowed Categories" has key `allowed_categories`.
+// See I-R011.
 const BRAND_CONFIG_QUERY = /* GraphQL */ `
   query GetBrandConfig {
     metaobjects(type: "brandconfig", first: 50) {
@@ -234,7 +235,7 @@ function mapFieldsToBrandConfig(
     heroImageUrl: fields.hero_image_url ?? '',
     brandDescription: fields.brand_description ?? '',
     buttonText: fields.button_text ?? '',
-    allowedCategories: parseAllowedCategories(fields['allowed Categories']),
+    allowedCategories: parseAllowedCategories(fields['allowed_categories']),
   }
 }
 
