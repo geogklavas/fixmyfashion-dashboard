@@ -7,7 +7,7 @@ type BrandConfigSnapshot = {
   matchedHandle: string | null
   candidateHandles: string[]
   rawFields: Record<string, string> | null
-  parsedConfig: { allowedCategories?: string[]; portalUrl?: string; brandName?: string } | null
+  parsedConfig: { allowedCategories?: string[]; returnUrl?: string; brandName?: string } | null
 }
 
 export function BrandConfigDiagnostic() {
@@ -43,7 +43,7 @@ export function BrandConfigDiagnostic() {
         <div>
           <div className="text-sm font-medium text-[#1a1a1a]">BrandConfig metaobject diagnostic</div>
           <div className="text-xs text-gray-500">
-            Inspect what Shopify returns for a brand_handle and how the app parses it.
+            Inspect what Shopify returns for a brand subdomain and how the app parses it.
           </div>
         </div>
         <div className="flex gap-2">

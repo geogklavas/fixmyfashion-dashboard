@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect('/login')
 
   const config = await getConfig(session.brandHandle)
-  const primary = config.primaryColor || '#0F6E56'
+  const primary = config.primary || '#0F6E56'
 
   return (
     <div className="min-h-screen bg-[#f9fafb]">

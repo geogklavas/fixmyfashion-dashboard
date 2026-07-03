@@ -43,16 +43,16 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-medium text-gray-700">Your repair portal</h2>
         <Row label="Portal URL" hint="Your branded repair portal">
           <a
-            href={`https://${config.portalUrl}`}
+            href={`https://${config.returnUrl}`}
             target="_blank"
             rel="noreferrer"
             className="text-[#0F6E56] text-sm font-medium hover:underline"
           >
-            {config.portalUrl}
+            {config.returnUrl}
           </a>
         </Row>
         <Row label="QR code" hint="For packaging inserts and in-store use">
-          <PortalQR portalUrl={config.portalUrl} brandHandle={config.brandHandle} />
+          <PortalQR portalUrl={config.returnUrl} brandHandle={config.brandHandle} />
         </Row>
         <Row label="Portal status" hint={`Live since ${liveSince}`}>
           <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#E1F5EE] text-[#0F6E56]">

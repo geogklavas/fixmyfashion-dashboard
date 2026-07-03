@@ -90,7 +90,7 @@ export default async function OverviewPage() {
       </section>
 
       {orders.length === 0 ? (
-        <NoRepairsYet portalUrl={config.portalUrl} />
+        <NoRepairsYet portalUrl={config.returnUrl} />
       ) : (
         <section className="bg-white border border-black/10 rounded-xl p-5">
           <h3 className="text-sm font-medium text-gray-700 mb-2">Monthly repair volume</h3>

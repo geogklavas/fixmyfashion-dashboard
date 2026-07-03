@@ -36,19 +36,34 @@ partner monitors their repair service performance. This is separate from the Sho
 - Legal footer with policy links live on all brand portals
 
 ### Live brand portal
-- be-casual.fixmyfashion.gr → live since April 15, 2026
-- Discount code: BECASUAL50 (50% off, pilot)
+- becasual.fixmyfashion.gr → live since April 15, 2026 (verified via DNS 2026-07-03)
+- Discount code: BECASUAL50 (50% off, pilot — applied outside BrandConfig, see I-R010)
 
 ### BrandConfig Metaobject — fields per brand entry
+
+**Type handle in Shopify:** `brandconfig` (one word, no underscore).
+**Verified 2026-07-03** via founder screenshots of live Admin. Prior 7-field list (with `brand_handle`, `primary_color`, `portal_url`, `discount_code`) was documentation drift — those fields DO NOT EXIST on the actual metaobject. See I-R006/007/010 for full history.
+
+Actual 11 fields on live metaobject:
 ```
-brand_handle        String    "becasual" (used for tag filtering)
-brand_name          String    "be-casual"
-brand_logo          File      (Shopify file URL)
-primary_color       String    hex color e.g. "#1a1a1a"
-portal_url          String    "be-casual.fixmyfashion.gr"
-allowed_categories  String    "pants, jackets, shirts" (comma-separated)
-discount_code       String    "BECASUAL50" (optional — empty = no banner)
+subdomain           String    "becasual" — used for tag filtering + subdomain match
+brand_name          String    "Be Casual" — display name
+logo                File      Shopify File — logo image asset (uploaded file)
+primary             String    hex color e.g. "#FEDA3D"
+secondary           String    hex color e.g. "#0D0D0D"
+return_url          URL       "https://becasual.fixmyfashion.gr/" — brand portal URL
+logo_url            URL       CDN URL to logo image (theme prefers this over `logo` file field)
+hero_image_url      URL       CDN URL to hero background image on brand portal
+brand_description   Text      Multi-line marketing copy shown on portal
+button_text         String    CTA button label on portal (currently misfilled — see I-R008)
+"allowed Categories" String   "category:pants, category:jackets, category:shirts, category:tops, category:hoodies"
+                              ⚠️ Field key has SPACE + CAPITAL C — breaks GraphQL by-key access
+                              Values have "category:" prefix that must be stripped client-side
 ```
+
+**Dashboard code alias:** internally the TypeScript uses `brandHandle` as variable name; that maps FROM the `subdomain` metaobject field. Do not confuse the two — the field on Shopify is `subdomain`.
+
+**Discount code (BECASUAL50):** NOT a BrandConfig field. Lives as standard Shopify Discount entity (Discounts admin section). Portal displays banner via different mechanism — TBD, see I-R010.
 
 ### Order Tags — final confirmed list
 
@@ -157,7 +172,7 @@ Version control: GitHub
 ## Data Model
 
 ### Brand identity
-Source: Shopify BrandConfig metaobject filtered by brand_handle
+Source: Shopify BrandConfig metaobject (`brandconfig` type) filtered by the `subdomain` field (mapped to internal `brandHandle` alias).
 
 ### Repair orders
 Source: Shopify orders filtered by tag `repair-b2b-[brandHandle]`
@@ -421,15 +436,33 @@ query GetBrandRepairs($brandHandle: String!, $cursor: String) {
 ```
 
 ### Fetch BrandConfig metaobject
+Type handle is `brandconfig` (one word, no underscore). Fetch all fields as `{ key value }` — DO NOT use structured field-by-name access because the `"allowed Categories"` field key contains a space and capital C which breaks GraphQL by-name field selection. Filter client-side by exact key match on `subdomain` (mapped to internal `brandHandle` alias).
 ```graphql
 query GetBrandConfig {
-  metaobjects(type: "brand_config", first: 50) {
+  metaobjects(type: "brandconfig", first: 50) {
     edges {
       node {
         fields { key value }
       }
     }
   }
+}
+```
+
+Consumers then map raw `fields` to the `BrandConfig` TypeScript shape:
+```typescript
+interface BrandConfig {
+  brandHandle: string       // internal alias, from subdomain field
+  brandName: string         // from brand_name
+  logo: string              // from logo (File asset)
+  primary: string           // hex color, from primary
+  secondary: string         // hex color, from secondary
+  returnUrl: string         // brand portal URL, from return_url
+  logoUrl: string           // CDN URL, from logo_url
+  heroImageUrl: string      // CDN URL, from hero_image_url
+  brandDescription: string  // from brand_description
+  buttonText: string        // from button_text
+  allowedCategories: string[]  // from "allowed Categories", category: prefix stripped
 }
 ```
 

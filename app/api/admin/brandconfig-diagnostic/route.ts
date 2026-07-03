@@ -5,9 +5,9 @@ import { getBrandConfigDiagnostic } from '@/lib/shopify'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Returns the raw metaobject fields for the brand_config matching `brand`,
-// the list of all brand_handle values found, and the parsed config the app
-// would render. Used to debug allowed_categories showing stale/wrong data.
+// Returns the raw metaobject fields for the brandconfig entry matching `brand`,
+// the list of all `subdomain` values found, and the parsed config the app
+// would render. Used to debug "allowed Categories" showing stale/wrong data.
 export async function GET(req: Request) {
   const session = await getSession()
   if (!session || session.role !== 'admin') {

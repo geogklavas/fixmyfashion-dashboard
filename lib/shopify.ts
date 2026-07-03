@@ -21,13 +21,19 @@ export interface ShopifyOrder {
 }
 
 export interface BrandConfig {
+  // Internal alias mapped from the `subdomain` metaobject field. Stays as
+  // `brandHandle` throughout dashboard code (JWT, URL routing, tag filtering).
   brandHandle: string
   brandName: string
-  brandLogo: string
-  primaryColor: string
-  portalUrl: string
+  logo: string
+  primary: string
+  secondary: string
+  returnUrl: string
+  logoUrl: string
+  heroImageUrl: string
+  brandDescription: string
+  buttonText: string
   allowedCategories: string[]
-  discountCode: string | null
 }
 
 export interface MonthlyData {
@@ -156,9 +162,13 @@ export async function getBrandOrders(brandHandle: string): Promise<ShopifyOrder[
   return orders
 }
 
+// Metaobject type handle is `brandconfig` (one word, no underscore).
+// Fields are fetched as `{ key value }` array — DO NOT switch to structured
+// field-by-name access: the `"allowed Categories"` field key contains a space
+// and capital C, which breaks GraphQL by-name field selection.
 const BRAND_CONFIG_QUERY = /* GraphQL */ `
   query GetBrandConfig {
-    metaobjects(type: "brand_config", first: 50) {
+    metaobjects(type: "brandconfig", first: 50) {
       edges {
         node {
           fields { key value }
@@ -174,23 +184,29 @@ type BrandConfigResponse = {
   }
 }
 
-// Parse the allowed_categories field. Shopify stores it either as a comma-
-// separated string ("pants, jackets") or as a JSON-encoded list (`["pants","jackets"]`)
-// depending on whether the metaobject field is text or list.text. Handle both.
+// Parse the "allowed Categories" field. Shopify stores it either as a comma-
+// separated string ("category:pants, category:jackets") or as a JSON-encoded
+// list (`["category:pants","category:jackets"]`) depending on whether the
+// metaobject field is text or list.text. Values carry a `category:` prefix
+// that must be stripped before display.
 export function parseAllowedCategories(raw: string | undefined | null): string[] {
   if (!raw) return []
   const trimmed = raw.trim()
+  const strip = (s: string): string => {
+    const t = String(s).trim()
+    return t.startsWith('category:') ? t.slice('category:'.length).trim() : t
+  }
   if (trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed)
       if (Array.isArray(parsed)) {
-        return parsed.map((s) => String(s).trim()).filter(Boolean)
+        return parsed.map(strip).filter(Boolean)
       }
     } catch {
       // fall through to comma-split
     }
   }
-  return trimmed.split(',').map((s) => s.trim()).filter(Boolean)
+  return trimmed.split(',').map(strip).filter(Boolean)
 }
 
 export type BrandConfigDiagnostic = {
@@ -200,6 +216,28 @@ export type BrandConfigDiagnostic = {
   parsedConfig: BrandConfig | null
 }
 
+// Map raw metaobject fields to the internal BrandConfig shape. `subdomain`
+// on the metaobject becomes `brandHandle` in TS — the alias is preserved
+// throughout dashboard code (JWT, URL routing, tag filtering).
+function mapFieldsToBrandConfig(
+  fields: Record<string, string>,
+  fallbackHandle: string,
+): BrandConfig {
+  return {
+    brandHandle: fields.subdomain ?? fallbackHandle,
+    brandName: fields.brand_name ?? fallbackHandle,
+    logo: fields.logo ?? '',
+    primary: fields.primary ?? '#0F6E56',
+    secondary: fields.secondary ?? '',
+    returnUrl: fields.return_url ?? '',
+    logoUrl: fields.logo_url ?? '',
+    heroImageUrl: fields.hero_image_url ?? '',
+    brandDescription: fields.brand_description ?? '',
+    buttonText: fields.button_text ?? '',
+    allowedCategories: parseAllowedCategories(fields['allowed Categories']),
+  }
+}
+
 // Returns BOTH the parsed config and a diagnostic snapshot. Used by the
 // /api/admin/brandconfig-diagnostic endpoint to debug the wrong-categories bug.
 export async function getBrandConfigDiagnostic(brandHandle: string): Promise<BrandConfigDiagnostic> {
@@ -207,18 +245,10 @@ export async function getBrandConfigDiagnostic(brandHandle: string): Promise<Bra
   const candidates: string[] = []
   for (const edge of data.metaobjects.edges) {
     const fields = Object.fromEntries(edge.node.fields.map((f) => [f.key, f.value]))
-    candidates.push(fields.brand_handle ?? '(missing)')
-    if (fields.brand_handle === brandHandle) {
-      const parsed: BrandConfig = {
-        brandHandle: fields.brand_handle ?? brandHandle,
-        brandName: fields.brand_name ?? brandHandle,
-        brandLogo: fields.brand_logo ?? '',
-        primaryColor: fields.primary_color ?? '#0F6E56',
-        portalUrl: fields.portal_url ?? '',
-        allowedCategories: parseAllowedCategories(fields.allowed_categories),
-        discountCode: fields.discount_code ? fields.discount_code : null,
-      }
-      return { matchedHandle: fields.brand_handle, candidateHandles: candidates, rawFields: fields, parsedConfig: parsed }
+    candidates.push(fields.subdomain ?? '(missing)')
+    if (fields.subdomain === brandHandle) {
+      const parsed = mapFieldsToBrandConfig(fields, brandHandle)
+      return { matchedHandle: fields.subdomain, candidateHandles: candidates, rawFields: fields, parsedConfig: parsed }
     }
   }
   return { matchedHandle: null, candidateHandles: candidates, rawFields: null, parsedConfig: null }
@@ -228,16 +258,8 @@ export async function getBrandConfig(brandHandle: string): Promise<BrandConfig |
   const data = await shopifyQuery<BrandConfigResponse>(BRAND_CONFIG_QUERY)
   for (const edge of data.metaobjects.edges) {
     const fields = Object.fromEntries(edge.node.fields.map((f) => [f.key, f.value]))
-    if (fields.brand_handle === brandHandle) {
-      return {
-        brandHandle: fields.brand_handle ?? brandHandle,
-        brandName: fields.brand_name ?? brandHandle,
-        brandLogo: fields.brand_logo ?? '',
-        primaryColor: fields.primary_color ?? '#0F6E56',
-        portalUrl: fields.portal_url ?? '',
-        allowedCategories: parseAllowedCategories(fields.allowed_categories),
-        discountCode: fields.discount_code ? fields.discount_code : null,
-      }
+    if (fields.subdomain === brandHandle) {
+      return mapFieldsToBrandConfig(fields, brandHandle)
     }
   }
   return null

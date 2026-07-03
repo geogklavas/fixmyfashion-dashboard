@@ -30,7 +30,7 @@ export default async function LogPage() {
     <div>
       <h1 className="text-xl font-semibold text-[#1a1a1a] mb-1">Repair log</h1>
       <p className="text-sm text-gray-500 mb-4">All repairs processed for your brand.</p>
-      {rows.length === 0 ? <NoRepairsYet portalUrl={config.portalUrl} /> : <RepairLogTable rows={rows} />}
+      {rows.length === 0 ? <NoRepairsYet portalUrl={config.returnUrl} /> : <RepairLogTable rows={rows} />}
     </div>
   )
 }

@@ -152,13 +152,18 @@ interface Fulfillment {
 }
 
 interface BrandConfig {
+  // Internal alias mapped from the `subdomain` metaobject field.
   brandHandle: string
   brandName: string
-  brandLogo: string
-  primaryColor: string
-  portalUrl: string
+  logo: string
+  primary: string
+  secondary: string
+  returnUrl: string
+  logoUrl: string
+  heroImageUrl: string
+  brandDescription: string
+  buttonText: string
   allowedCategories: string[]
-  discountCode: string | null
 }
 ```
 

@@ -121,10 +121,14 @@ export function mockBrandConfig(brandHandle: string): BrandConfig {
   return {
     brandHandle,
     brandName: nameMap[brandHandle] ?? brandHandle,
-    brandLogo: '',
-    primaryColor: '#0F6E56',
-    portalUrl: `${brandHandle}.fixmyfashion.gr`,
+    logo: '',
+    primary: '#0F6E56',
+    secondary: '#0D0D0D',
+    returnUrl: `${brandHandle}.fixmyfashion.gr`,
+    logoUrl: '',
+    heroImageUrl: '',
+    brandDescription: '',
+    buttonText: '',
     allowedCategories: ['pants', 'jackets', 'shirts', 'dresses'],
-    discountCode: brandHandle === 'becasual' ? 'BECASUAL50' : null,
   }
 }
