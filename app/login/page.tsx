@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 
-type Status = 'idle' | 'sending' | 'sent' | 'not_found' | 'error'
+type Status = 'idle' | 'sending' | 'sent' | 'error'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -19,8 +19,6 @@ export default function LoginPage() {
       })
       if (res.ok) {
         setStatus('sent')
-      } else if (res.status === 404) {
-        setStatus('not_found')
       } else {
         setStatus('error')
       }
@@ -63,9 +61,6 @@ export default function LoginPage() {
             >
               {status === 'sending' ? 'Sending…' : 'Send login link'}
             </button>
-            {status === 'not_found' && (
-              <p className="text-xs text-[#BA7517] text-center">Email not recognised.</p>
-            )}
             {status === 'error' && (
               <p className="text-xs text-red-600 text-center">Something went wrong, try again.</p>
             )}

@@ -96,6 +96,23 @@ create index if not exists magic_links_created_at_idx on magic_links (created_at
 
 
 -- -----------------------------------------------------------------------------
+-- login_attempts — every POST to /api/auth/send-link, matched or not (Brief 4 F1)
+-- -----------------------------------------------------------------------------
+-- magic_links only gets a row on a real brand match, so it can't rate-limit
+-- unknown-email probing. This table logs every attempt so both the per-email
+-- and per-IP counters in the send-link route see unmatched attempts too.
+create table if not exists login_attempts (
+  id          uuid primary key default gen_random_uuid(),
+  email       text not null,
+  ip          text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists login_attempts_email_created_idx on login_attempts (email, created_at);
+create index if not exists login_attempts_ip_created_idx on login_attempts (ip, created_at);
+
+
+-- -----------------------------------------------------------------------------
 -- category_change_requests — brand asks to change its allowed repair categories
 -- -----------------------------------------------------------------------------
 -- NOTE: as of 2026-10-31 NOTHING in the codebase inserts into this table. The
