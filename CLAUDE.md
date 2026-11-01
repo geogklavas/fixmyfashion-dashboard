@@ -385,7 +385,12 @@ Unlike supabase-js, **the driver throws on error** rather than returning an
 `{ error }` tuple; anything that needs to degrade gracefully needs its own
 try/catch (see `lib/launch-checklist.ts`).
 
-Three tables only: `brand_sessions`, `magic_links`, `category_change_requests`.
+Four tables: `brand_sessions`, `magic_links`, `category_change_requests`, and
+`login_attempts` (added by Brief 4 `97a3d63` — logs every `/api/auth/send-link`
+POST, matched or not, to drive per-IP + per-email rate limiting that
+`magic_links` cannot, since it only gets a row on a real brand match).
+⚠️ `login_attempts` stores email + IP and currently has **no retention** — see
+I-R016; the weekly purge must be extended to prune it.
 Deliberately absent, because no code references them: the table
 `admin_sessions` (admin auth runs off `brand_sessions.role`) and the columns
 `magic_token`, `token_expires_at`, `report_preference`, `resolved_at`.
