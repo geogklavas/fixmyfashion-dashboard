@@ -7,7 +7,7 @@ import {
   createSessionToken,
   getSession,
 } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db, first } from '@/lib/db'
 
 export const runtime = 'nodejs'
 
@@ -31,15 +31,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'brandHandle_required' }, { status: 400 })
   }
 
-  const { data: brand } = await supabaseAdmin()
-    .from('brand_sessions')
-    .select('brand_handle, brand_name, brand_email, role')
-    .eq('brand_handle', body.brandHandle)
-    .maybeSingle()
+  type BrandRow = { brand_handle: string; brand_name: string; brand_email: string; role: string | null }
+  let target: BrandRow | undefined
+  try {
+    target = first<BrandRow>(
+      await db()`select brand_handle, brand_name, brand_email, role
+                 from brand_sessions where brand_handle = ${body.brandHandle} limit 1`,
+    )
+  } catch (err) {
+    console.error('[impersonate] brand lookup failed', err)
+    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+  }
 
-  if (!brand) return NextResponse.json({ error: 'brand_not_found' }, { status: 404 })
+  if (!target) return NextResponse.json({ error: 'brand_not_found' }, { status: 404 })
 
-  const target = brand as { brand_handle: string; brand_name: string; brand_email: string; role: string | null }
   if (target.role === 'admin') {
     return NextResponse.json({ error: 'cannot_impersonate_admin' }, { status: 400 })
   }

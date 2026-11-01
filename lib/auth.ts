@@ -5,7 +5,10 @@ export const SESSION_COOKIE = 'fmf_session'
 // When admin impersonates a brand, we stash their original token here so they
 // can pop back to /admin without re-authenticating.
 export const ADMIN_RETURN_COOKIE = 'fmf_admin_return'
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30 // 30 days
+// 7 days (Sprint 7 item S7-S1, was 30). Shorter than a month means a lost or
+// stolen laptop stops being a live session within a week. The header already
+// has an explicit Logout button for ending one sooner.
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
 export type SessionRole = 'brand' | 'admin'
 

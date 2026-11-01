@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase'
+import { db, first } from './db'
 
 export type LaunchChecklist = {
   footerDone: boolean
@@ -15,23 +15,25 @@ const DEFAULT: LaunchChecklist = {
 }
 
 // Reads the launch checklist + next review date for a brand.
-// Returns defaults (all false, no date) if the Supabase columns don't exist
-// yet — keeps the dashboard running before the migration is applied.
+// Returns defaults (all false, no date) on ANY failure — unreachable database,
+// missing row, missing columns. This banner is decorative; it must never be the
+// reason a dashboard tab 500s. The try/catch matters more since the move to
+// Neon (2026-11-01): the Neon driver throws, where supabase-js returned an
+// `{ error }` tuple that fell through to the same default.
 export async function getLaunchChecklist(brandHandle: string): Promise<LaunchChecklist> {
   try {
-    const sb = supabaseAdmin()
-    const { data, error } = await sb
-      .from('brand_sessions')
-      .select('launch_footer_done, launch_email_done, launch_packaging_done, next_review_date')
-      .eq('brand_handle', brandHandle)
-      .maybeSingle()
-    if (error || !data) return DEFAULT
-    const row = data as {
+    type Row = {
       launch_footer_done?: boolean | null
       launch_email_done?: boolean | null
       launch_packaging_done?: boolean | null
       next_review_date?: string | null
     }
+    const row = first<Row>(
+      await db()`select launch_footer_done, launch_email_done,
+                        launch_packaging_done, next_review_date
+                 from brand_sessions where brand_handle = ${brandHandle} limit 1`,
+    )
+    if (!row) return DEFAULT
     return {
       footerDone: !!row.launch_footer_done,
       emailDone: !!row.launch_email_done,

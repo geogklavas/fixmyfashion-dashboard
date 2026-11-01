@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.104.0",
+    "@neondatabase/serverless": "^1.2.0",
     "@types/qrcode": "^1.5.6",
     "jose": "^6.2.2",
     "jspdf": "^4.2.1",

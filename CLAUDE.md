@@ -55,7 +55,7 @@ return_url          URL       "https://becasual.fixmyfashion.gr/" — brand port
 logo_url            URL       CDN URL to logo image (theme prefers this over `logo` file field)
 hero_image_url      URL       CDN URL to hero background image on brand portal
 brand_description   Text      Multi-line marketing copy shown on portal
-button_text         String    CTA button label on portal (currently misfilled — see I-R008)
+button_text         String    ⚠️ HEX COLOR for button TEXT color (NOT the label). Theme reads via `color_extract`; non-hex values → browser link default (visited=purple). Actual button labels hardcoded in theme locale strings. See I-R008.
 allowed_categories  String   "category:pants, category:jackets, category:shirts, category:tops, category:hoodies"
                               Field KEY is snake_case (returned by GraphQL). Display name in
                               Shopify Admin UI is "allowed Categories" (confusing). Filter by
@@ -149,7 +149,7 @@ NO COD flow. NO Email #4. Card payments only.
 Framework:      Next.js 14 (App Router)
 Hosting:        Vercel (free tier)
 Auth:           Resend (magic link emails) + JWT in HttpOnly cookie
-Database:       Supabase (free tier) — auth/session state only in Stage 1
+Database:       Neon Postgres (free tier) — auth/session state only in Stage 1
 Data:           Shopify Admin GraphQL API
 Styling:        Tailwind CSS
 Charts:         Recharts
@@ -300,6 +300,11 @@ Do not build. Removed from scope. Do not add to navigation.
 
 ## Project Structure
 
+**There is no brand-facing REST layer.** Brand data is fetched server-side
+directly inside the page components (React `cache()` dedupes within a render).
+Earlier revisions of this file listed `/api/brand/config`, `/api/repairs` and
+`/api/repairs/stats` — none of those ever existed. See I-R013.
+
 ```
 /app
   /dashboard
@@ -314,22 +319,31 @@ Do not build. Removed from scope. Do not add to navigation.
   /login/page.tsx
   /auth/verify/page.tsx
   /admin/page.tsx
-/api
-  /auth/send-link/route.ts
-  /auth/verify/route.ts
-  /auth/logout/route.ts
-  /brand/config/route.ts
-  /repairs/route.ts
-  /repairs/stats/route.ts
+  /api                         → the complete API surface, 11 routes
+    /admin/brand-checklist/route.ts
+    /admin/brandconfig-diagnostic/route.ts
+    /admin/impersonate/route.ts
+    /admin/impersonate/exit/route.ts
+    /admin/shopify-diagnostic/route.ts
+    /auth/send-link/route.ts
+    /auth/verify/route.ts
+    /auth/logout/route.ts
+    /cron/purge/route.ts       → weekly magic_links retention (S7-M1)
+    /shopify/install/route.ts
+    /shopify/callback/route.ts
 /components
   /dashboard/
   /charts/
   /ui/
+/db
+  schema.sql                   → database source of truth
 /lib
   /shopify.ts
   /auth.ts
   /sustainability.ts
-  /supabase.ts
+  /db.ts                       → Neon Postgres client (replaced supabase.ts)
+/scripts/qa-runtime/           → verification scripts, see its README
+vercel.json                    → cron schedule
 ```
 
 ---
@@ -345,53 +359,36 @@ JWT_SECRET=...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=FixMyFashion <dashboard@fixmyfashion.gr>
 DASHBOARD_URL=https://dashboard.fixmyfashion.gr
-NEXT_PUBLIC_SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...
+DATABASE_URL=postgresql://...-pooler...neon.tech/neondb?sslmode=require
+CRON_SECRET=...   # Vercel sends this as a bearer token to /api/cron/purge
 ```
 
 ---
 
-## Supabase Schema
+## Database Schema
 
-```sql
-CREATE TABLE brand_sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand_handle text NOT NULL,
-  brand_name text NOT NULL,
-  brand_email text NOT NULL,
-  role text DEFAULT 'brand',
-  magic_token text,
-  token_expires_at timestamptz,
-  last_login_at timestamptz,
-  created_at timestamptz DEFAULT now(),
-  report_preference text DEFAULT 'monthly_pdf_csv',
-  next_review_date date
-);
+**Source of truth: [`db/schema.sql`](db/schema.sql). Do not duplicate it here.**
 
-CREATE TABLE magic_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand_handle text NOT NULL,
-  token text NOT NULL UNIQUE,
-  expires_at timestamptz NOT NULL,
-  used boolean DEFAULT false,
-  created_at timestamptz DEFAULT now()
-);
+That file is idempotent, creates the three tables plus indexes and
+`purge_old_magic_links()`, and seeds the two live accounts. Change a column
+there first, then apply it.
 
-CREATE TABLE category_change_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand_handle text NOT NULL,
-  requested_categories text NOT NULL,
-  status text DEFAULT 'pending',
-  created_at timestamptz DEFAULT now(),
-  resolved_at timestamptz
-);
+Keeping a second copy of the schema in prose is exactly what caused I-R012:
+when the old Supabase project locked out, the schema existed nowhere except
+this document and a web console, and had to be reconstructed by auditing every
+call site. Hence the rule above.
 
-CREATE TABLE admin_sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text NOT NULL UNIQUE,
-  last_login_at timestamptz
-);
-```
+**Provider: Neon** (PostgreSQL 18, `aws-eu-central-1`), since 2026-11-01.
+Connect via `lib/db.ts`, which wraps `@neondatabase/serverless`. Queries are
+tagged templates so every value is parameterised — never concatenate SQL.
+Unlike supabase-js, **the driver throws on error** rather than returning an
+`{ error }` tuple; anything that needs to degrade gracefully needs its own
+try/catch (see `lib/launch-checklist.ts`).
+
+Three tables only: `brand_sessions`, `magic_links`, `category_change_requests`.
+Deliberately absent, because no code references them: the table
+`admin_sessions` (admin auth runs off `brand_sessions.role`) and the columns
+`magic_token`, `token_expires_at`, `report_preference`, `resolved_at`.
 
 ---
 

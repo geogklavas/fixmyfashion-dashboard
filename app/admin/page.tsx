@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import { getOrders, thisMonthCount } from '@/lib/data'
 import { ShopifyDiagnostic } from '@/components/dashboard/ShopifyDiagnostic'
 import { BrandConfigDiagnostic } from '@/components/dashboard/BrandConfigDiagnostic'
@@ -42,21 +42,33 @@ export default async function AdminPage() {
   const session = await getSession()
   if (!session || session.role !== 'admin') redirect('/login')
 
-  const sb = supabaseAdmin()
-  const { data: brands } = await sb
-    .from('brand_sessions')
-    .select(
-      'brand_handle, brand_name, brand_email, last_login_at, role, launch_footer_done, launch_email_done, launch_packaging_done, next_review_date',
-    )
-    .order('brand_name', { ascending: true })
+  const sql = db()
 
-  const { data: requests } = await sb
-    .from('category_change_requests')
-    .select('id, brand_handle, requested_categories, status, created_at')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+  // Both reads degrade to empty rather than crashing the whole admin page —
+  // the Shopify-sourced panels below are still useful without them.
+  let brands: BrandRow[] = []
+  let requests: CategoryRequest[] = []
+  try {
+    brands = (await sql`
+      select brand_handle, brand_name, brand_email, last_login_at, role,
+             launch_footer_done, launch_email_done, launch_packaging_done,
+             next_review_date
+      from brand_sessions
+      order by brand_name asc`) as unknown as BrandRow[]
+  } catch (err) {
+    console.error('[admin] brand_sessions read failed', err)
+  }
+  try {
+    requests = (await sql`
+      select id, brand_handle, requested_categories, status, created_at
+      from category_change_requests
+      where status = 'pending'
+      order by created_at desc`) as unknown as CategoryRequest[]
+  } catch (err) {
+    console.error('[admin] category_change_requests read failed', err)
+  }
 
-  const brandList = ((brands ?? []) as BrandRow[]).filter((b) => b.role !== 'admin')
+  const brandList = brands.filter((b) => b.role !== 'admin')
 
   const brandStats = await Promise.all(
     brandList.map(async (b) => {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { Resend } from 'resend'
-import { supabaseAdmin } from '@/lib/supabase'
+import { db, first } from '@/lib/db'
 
 export const runtime = 'nodejs'
 
@@ -20,15 +20,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'email_required', code: 'email_required' }, { status: 400 })
   }
 
-  const sb = supabaseAdmin()
-  const { data: brand, error: brandErr } = await sb
-    .from('brand_sessions')
-    .select('brand_handle, brand_name, brand_email')
-    .ilike('brand_email', email)
-    .maybeSingle()
+  const sql = db()
+  type BrandRow = { brand_handle: string; brand_name: string; brand_email: string }
+  let brand: BrandRow | undefined
 
-  if (brandErr) {
-    console.error('[send-link] supabase lookup failed', brandErr)
+  // Exact case-insensitive match. The old code used supabase `.ilike()` with no
+  // wildcards, which is an equality test — NOT a pattern match. Translating it to
+  // SQL `ILIKE` would make `_` and `%` in user input significant, so compare
+  // lower() to lower() instead. Index: brand_sessions_email_lower_idx.
+  try {
+    brand = first<BrandRow>(
+      await sql`select brand_handle, brand_name, brand_email
+                from brand_sessions
+                where lower(brand_email) = lower(${email}) limit 1`,
+    )
+  } catch (err) {
+    console.error('[send-link] brand lookup failed', err)
     return NextResponse.json({ error: 'server_error', code: 'server_error' }, { status: 500 })
   }
 
@@ -39,15 +46,11 @@ export async function POST(req: Request) {
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MINUTES * 60_000).toISOString()
 
-  const { error: insertErr } = await sb.from('magic_links').insert({
-    brand_handle: brand.brand_handle,
-    token,
-    expires_at: expiresAt,
-    used: false,
-  })
-
-  if (insertErr) {
-    console.error('[send-link] magic_links insert failed', insertErr)
+  try {
+    await sql`insert into magic_links (brand_handle, token, expires_at, used)
+              values (${brand.brand_handle}, ${token}, ${expiresAt}, false)`
+  } catch (err) {
+    console.error('[send-link] magic_links insert failed', err)
     return NextResponse.json({ error: 'server_error', code: 'server_error' }, { status: 500 })
   }
 

@@ -2,14 +2,22 @@
 -- FixMyFashion Repair — Dashboard database schema
 -- =============================================================================
 --
--- Target: PostgreSQL (Supabase or any Postgres). Idempotent — safe to re-run.
+-- Target: PostgreSQL 18 on Neon. Plain Postgres — no vendor extensions.
+-- Idempotent: safe to re-run.
+--
+-- Apply with:  node --env-file=.env.local scripts/qa-runtime/apply-schema.mjs
+-- or paste into the Neon console SQL editor.
 --
 -- WHY THIS FILE EXISTS
 -- The schema previously existed only as prose in CLAUDE.md and as SQL typed by
--- hand into the Supabase web console. When the free-tier project locked out
+-- hand into the Supabase web console. When that free-tier project locked out
 -- after repeated dormancy (2026-10-31, I-R012), there was no way to recreate it
--- without auditing the application code column by column. That audit is now
--- baked in here. This file is the source of truth; CLAUDE.md documents it.
+-- without auditing the application code column by column. That audit is baked
+-- in here. This file is the source of truth; CLAUDE.md points at it.
+--
+-- It is also why the move off Supabase took minutes rather than days: the same
+-- file applied unchanged to Neon. Keep it that way — if you change a column,
+-- change it here first.
 --
 -- HOW IT WAS DERIVED
 -- Every column below is one the application actually reads or writes. Verified
@@ -28,10 +36,13 @@
 -- Do not re-add these without a code path that uses them.
 --
 -- ACCESS MODEL
--- The app connects exclusively with the service-role key (lib/supabase.ts).
--- The anon key is never used. RLS is therefore enabled with NO policies: the
--- service role bypasses RLS, and anything else gets nothing. This is stricter
--- than the original setup and costs us nothing.
+-- Neon exposes no public HTTP interface to the database — the only way in is a
+-- connection string. The app connects as the owning role via `lib/db.ts`.
+-- There is therefore NO Row Level Security here. The earlier Supabase version
+-- of this file enabled RLS with no policies purely to neutralise Supabase's
+-- auto-generated public PostgREST endpoint; with no such endpoint, RLS would
+-- protect against nothing while risking locking us out. Do not add it back
+-- unless a browser-side client is introduced.
 -- =============================================================================
 
 
@@ -103,17 +114,6 @@ create table if not exists category_change_requests (
 
 create index if not exists category_change_requests_status_idx
   on category_change_requests (status);
-
-
--- -----------------------------------------------------------------------------
--- Row Level Security — deny everything except the service role
--- -----------------------------------------------------------------------------
-alter table brand_sessions            enable row level security;
-alter table magic_links               enable row level security;
-alter table category_change_requests  enable row level security;
--- Intentionally no policies. The service role bypasses RLS; every other key
--- gets zero rows. If a browser-side client is ever introduced, add policies
--- here first — do not disable RLS.
 
 
 -- =============================================================================
